@@ -12,6 +12,7 @@ mod network;
 mod package;
 mod service;
 mod shell;
+pub mod sysinfo;
 mod update;
 
 use anyhow::Result;

@@ -1,5 +1,7 @@
 # lux
 
+*light for your Linux desktop*
+
 AI agent for Linux desktop. Manages your system through natural language.
 
 ```
@@ -16,6 +18,16 @@ lux> my disk is almost full
 Filesystem      Size  Used Avail Use% Mounted on
 /dev/sda1       100G   89G   11G  89% /
 ```
+
+## Why lux?
+
+Linux is powerful but unfriendly. Finding the right command, flag, or
+config file is a Google-and-pray loop — and half the answers are for the
+wrong distro. lux is named after the Latin word for *light*: it
+illuminates your system. Ask a question in plain English; lux picks the
+right tool, runs it, and shows you what happened.
+
+Built for people who want their Linux machine to just work.
 
 ## How it works
 
