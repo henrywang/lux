@@ -579,7 +579,6 @@ name = "lux-agent"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "lux-knowledge",
  "lux-llm",
  "lux-tools",
  "serde",

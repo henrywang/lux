@@ -5,7 +5,7 @@
 //! Conservative by design — a missed match is better than a wrong match.
 
 use lux_llm::ToolCall;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// Known GUI apps → Flatpak app IDs.
 const FLATPAK_APPS: &[(&str, &str)] = &[
@@ -61,7 +61,10 @@ const SERVICE_ALIASES: &[(&str, &str)] = &[
 ];
 
 fn tool_call(name: &str, args: Value) -> ToolCall {
-    ToolCall { name: name.to_string(), arguments: args }
+    ToolCall {
+        name: name.to_string(),
+        arguments: args,
+    }
 }
 
 /// Try to match user input to a tool call without the LLM.
@@ -83,27 +86,37 @@ pub fn match_intent(input: &str) -> Option<ToolCall> {
 
 /// High-confidence system info queries → run_command.
 fn try_run_command(s: &str) -> Option<ToolCall> {
-    let cmd = if s.contains("ip address") || s.contains("ip addr") || s.contains("my ip")
+    let cmd = if s.contains("ip address")
+        || s.contains("ip addr")
+        || s.contains("my ip")
         || (s.contains("ip") && s.contains("machine"))
         || (s.contains("ip") && s.contains("this"))
     {
         "ip addr show"
     } else if s.contains("selinux") {
-        if s.contains("status") { "sestatus" } else { "getenforce" }
+        if s.contains("status") {
+            "sestatus"
+        } else {
+            "getenforce"
+        }
     } else if s.contains("uname") || s.contains("kernel version") || s.contains("kernel am i") {
         "uname -r"
     } else if s.contains("uptime") || s.contains("how long") && s.contains("running") {
         "uptime"
     } else if s.contains("hostname") {
         "hostname"
-    } else if s.contains("memory") && s.contains("free") || s.contains("ram") && s.contains("free") {
+    } else if s.contains("memory") && s.contains("free") || s.contains("ram") && s.contains("free")
+    {
         "free -h"
     } else if (s.contains("is") || s.contains("have") || s.contains("do i have"))
         && s.contains("installed")
     {
         // "is vim installed?" / "do I have git installed?" → rpm -q <pkg>
         let pkg = extract_package_for_query(s)?;
-        return Some(tool_call("run_command", json!({"command": format!("rpm -q {pkg}")})));
+        return Some(tool_call(
+            "run_command",
+            json!({"command": format!("rpm -q {pkg}")}),
+        ));
     } else {
         return None;
     };
@@ -115,20 +128,24 @@ fn extract_package_for_query(s: &str) -> Option<&str> {
     // "is vim installed" / "do i have git installed" / "is python3 installed"
     // Try to grab the word before "installed"
     let words: Vec<&str> = s.split_whitespace().collect();
-    let installed_pos = words.iter().position(|&w| w.trim_matches(|c: char| !c.is_alphanumeric()) == "installed")?;
+    let installed_pos = words
+        .iter()
+        .position(|&w| w.trim_matches(|c: char| !c.is_alphanumeric()) == "installed")?;
     // Walk back to find the package name (skip "is", "have", "i", "do")
     let skip = ["is", "are", "have", "i", "do", "a", "the", "it"];
-    for &word in words[..installed_pos].iter().rev() {
-        if !skip.contains(&word) {
-            return Some(word);
-        }
-    }
-    None
+    words[..installed_pos]
+        .iter()
+        .rev()
+        .copied()
+        .find(|word| !skip.contains(word))
 }
 
 fn try_bootc(s: &str) -> Option<ToolCall> {
-    if s.contains("rollback") || s.contains("roll back") || s.contains("go back")
-        || (s.contains("revert") && (s.contains("update") || s.contains("image") || s.contains("version")))
+    if s.contains("rollback")
+        || s.contains("roll back")
+        || s.contains("go back")
+        || (s.contains("revert")
+            && (s.contains("update") || s.contains("image") || s.contains("version")))
         || (s.contains("undo") && s.contains("update"))
         || (s.contains("broke") && s.contains("update"))
         || (s.contains("last update") && (s.contains("back") || s.contains("broke")))
@@ -158,12 +175,12 @@ fn try_bootc(s: &str) -> Option<ToolCall> {
 fn extract_fedora_version(s: &str) -> Option<String> {
     let words: Vec<&str> = s.split_whitespace().collect();
     for i in 0..words.len() {
-        if words[i] == "fedora" {
-            if let Some(ver) = words.get(i + 1) {
-                let ver = ver.trim_matches(|c: char| !c.is_ascii_digit());
-                if !ver.is_empty() {
-                    return Some(ver.to_string());
-                }
+        if words[i] == "fedora"
+            && let Some(ver) = words.get(i + 1)
+        {
+            let ver = ver.trim_matches(|c: char| !c.is_ascii_digit());
+            if !ver.is_empty() {
+                return Some(ver.to_string());
             }
         }
     }
@@ -194,7 +211,8 @@ fn try_firewall(s: &str) -> Option<ToolCall> {
     }
 
     // Port / service firewall rules
-    let has_firewall_intent = s.contains("firewall") || s.contains("port")
+    let has_firewall_intent = s.contains("firewall")
+        || s.contains("port")
         || (s.contains("allow") && (s.contains("through") || s.contains("traffic")))
         || (s.contains("block") && s.contains("port"))
         || (s.contains("open") && s.contains("port"));
@@ -203,9 +221,13 @@ fn try_firewall(s: &str) -> Option<ToolCall> {
         return None;
     }
 
-    let action = if s.contains("allow") || s.contains("open") { "allow" }
-        else if s.contains("block") || s.contains("deny") || s.contains("close") { "deny" }
-        else { return None; };
+    let action = if s.contains("allow") || s.contains("open") {
+        "allow"
+    } else if s.contains("block") || s.contains("deny") || s.contains("close") {
+        "deny"
+    } else {
+        return None;
+    };
 
     let mut args = serde_json::Map::new();
     args.insert("action".into(), json!(action));
@@ -233,10 +255,16 @@ fn extract_port(s: &str) -> Option<String> {
 }
 
 fn try_network(s: &str) -> Option<ToolCall> {
-    let is_network = s.contains("wifi") || s.contains("wireless")
+    let is_network = s.contains("wifi")
+        || s.contains("wireless")
         || s.contains("ethernet")
-        || (s.contains("internet") && (s.contains("not") || s.contains("down") || s.contains("can't") || s.contains("no ")))
-        || (s.contains("network") && (s.contains("not") || s.contains("down") || s.contains("connect")))
+        || (s.contains("internet")
+            && (s.contains("not")
+                || s.contains("down")
+                || s.contains("can't")
+                || s.contains("no ")))
+        || (s.contains("network")
+            && (s.contains("not") || s.contains("down") || s.contains("connect")))
         || s.contains("can't reach")
         || s.contains("no internet")
         || s.contains("dns") && s.contains("not")
@@ -258,7 +286,11 @@ fn try_network(s: &str) -> Option<ToolCall> {
 }
 
 fn try_disk(s: &str) -> Option<ToolCall> {
-    let is_disk = s.contains("disk") && (s.contains("space") || s.contains("usage") || s.contains("full") || s.contains("using"))
+    let is_disk = s.contains("disk")
+        && (s.contains("space")
+            || s.contains("usage")
+            || s.contains("full")
+            || s.contains("using"))
         || s.contains("storage") && s.contains("space")
         || s.contains("how much space")
         || s.contains("out of space")
@@ -272,7 +304,7 @@ fn try_disk(s: &str) -> Option<ToolCall> {
     let path = ["/home", "/var", "/tmp", "/boot", "/usr"]
         .iter()
         .find(|&&p| s.contains(p))
-        .map(|&p| p);
+        .copied();
 
     let args = if let Some(p) = path {
         json!({"path": p})
@@ -284,9 +316,11 @@ fn try_disk(s: &str) -> Option<ToolCall> {
 }
 
 fn try_logs(s: &str) -> Option<ToolCall> {
-    let is_logs = s.contains("log") && (s.contains("show") || s.contains("read") || s.contains("check") || s.contains("what"))
+    let is_logs = s.contains("log")
+        && (s.contains("show") || s.contains("read") || s.contains("check") || s.contains("what"))
         || s.contains("journal")
-        || (s.contains("error") || s.contains("critical") || s.contains("warning")) && (s.contains("system") || s.contains("today") || s.contains("hour"))
+        || (s.contains("error") || s.contains("critical") || s.contains("warning"))
+            && (s.contains("system") || s.contains("today") || s.contains("hour"))
         || s.contains("what happened") && s.contains("with")
         || s.contains("authentication failure")
         || s.contains("failed login")
@@ -332,10 +366,10 @@ fn try_logs(s: &str) -> Option<ToolCall> {
 fn extract_minutes(s: &str) -> Option<u32> {
     let words: Vec<&str> = s.split_whitespace().collect();
     for i in 0..words.len() {
-        if words[i].ends_with("minutes") || words.get(i + 1) == Some(&"minutes") {
-            if let Ok(n) = words[i].parse::<u32>() {
-                return Some(n);
-            }
+        if (words[i].ends_with("minutes") || words.get(i + 1) == Some(&"minutes"))
+            && let Ok(n) = words[i].parse::<u32>()
+        {
+            return Some(n);
         }
     }
     None
@@ -368,19 +402,29 @@ fn try_install(s: &str) -> Option<ToolCall> {
 }
 
 fn extract_package_names(s: &str) -> Vec<String> {
-    let stop = ["the", "a", "an", "for", "me", "my", "please", "i", "want", "need",
-                "and", "also", "both", "some", "using", "with", "on", "in", "to"];
-    s.split(|c: char| c == ',' || c == ' ')
+    let stop = [
+        "the", "a", "an", "for", "me", "my", "please", "i", "want", "need", "and", "also", "both",
+        "some", "using", "with", "on", "in", "to",
+    ];
+    s.split([',', ' '])
         .flat_map(|w| w.split("and"))
-        .map(|w| w.trim().trim_matches(|c: char| !c.is_alphanumeric() && c != '-' && c != '_').to_string())
+        .map(|w| {
+            w.trim()
+                .trim_matches(|c: char| !c.is_alphanumeric() && c != '-' && c != '_')
+                .to_string()
+        })
         .filter(|w| !w.is_empty() && !stop.contains(&w.as_str()) && w.len() > 1)
         .collect()
 }
 
 fn try_remove(s: &str) -> Option<ToolCall> {
-    let prefix = if s.contains("uninstall") { "uninstall" }
-        else if s.contains("remove") { "remove" }
-        else { return None; };
+    let prefix = if s.contains("uninstall") {
+        "uninstall"
+    } else if s.contains("remove") {
+        "remove"
+    } else {
+        return None;
+    };
 
     let rest = s.split(prefix).nth(1)?.trim().to_string();
     let packages = extract_package_names(&rest);
@@ -392,20 +436,31 @@ fn try_remove(s: &str) -> Option<ToolCall> {
 }
 
 fn try_service_action(s: &str) -> Option<ToolCall> {
-    let action = if s.contains("restart") { "restart" }
-        else if s.contains("enable") { "enable" }
-        else if s.contains("disable") { "disable" }
-        else if s.contains("stop") && !s.contains("stopped") { "stop" }
-        else if s.contains("start") && !s.contains("restart") { "start" }
-        else { return None; };
+    let action = if s.contains("restart") {
+        "restart"
+    } else if s.contains("enable") {
+        "enable"
+    } else if s.contains("disable") {
+        "disable"
+    } else if s.contains("stop") && !s.contains("stopped") {
+        "stop"
+    } else if s.contains("start") && !s.contains("restart") {
+        "start"
+    } else {
+        return None;
+    };
 
     // Require a known service name to avoid false positives
     let service = resolve_service(s)?;
-    Some(tool_call("manage_service", json!({"service": service, "action": action})))
+    Some(tool_call(
+        "manage_service",
+        json!({"service": service, "action": action}),
+    ))
 }
 
 fn try_service_status(s: &str) -> Option<ToolCall> {
-    let is_status = (s.contains("is ") && (s.contains("running") || s.contains("active") || s.contains("working")))
+    let is_status = (s.contains("is ")
+        && (s.contains("running") || s.contains("active") || s.contains("working")))
         || (s.contains("check") && s.contains("service"))
         || s.contains("status of")
         || (s.contains("my") && s.contains("working"));
@@ -416,11 +471,17 @@ fn try_service_status(s: &str) -> Option<ToolCall> {
 
     // "my printer isn't working" → cups
     if (s.contains("printer") || s.contains("printing")) && s.contains("working") {
-        return Some(tool_call("check_service_status", json!({"service": "cups"})));
+        return Some(tool_call(
+            "check_service_status",
+            json!({"service": "cups"}),
+        ));
     }
 
     let service = resolve_service(s)?;
-    Some(tool_call("check_service_status", json!({"service": service})))
+    Some(tool_call(
+        "check_service_status",
+        json!({"service": service}),
+    ))
 }
 
 fn resolve_service(s: &str) -> Option<&'static str> {
@@ -428,7 +489,10 @@ fn resolve_service(s: &str) -> Option<&'static str> {
     if s.contains("printer") || s.contains("printing") {
         return Some("cups");
     }
-    if s.contains("bluetooth") || s.contains("headphone") || s.contains("speaker") && !s.contains("firewall") {
+    if s.contains("bluetooth")
+        || s.contains("headphone")
+        || s.contains("speaker") && !s.contains("firewall")
+    {
         return Some("bluetooth");
     }
     for (keyword, service) in SERVICE_ALIASES {
@@ -455,7 +519,10 @@ mod tests {
     }
 
     fn assert_no_match(input: &str) {
-        assert!(match_intent(input).is_none(), "unexpected match for: {input:?}");
+        assert!(
+            match_intent(input).is_none(),
+            "unexpected match for: {input:?}"
+        );
     }
 
     // ---- install_flatpak ----
@@ -465,9 +532,13 @@ mod tests {
         assert_tool_args("install firefox", "install_flatpak", |args| {
             assert_eq!(args["app_id"], "org.mozilla.firefox");
         });
-        assert_tool_args("install GIMP for photo editing", "install_flatpak", |args| {
-            assert_eq!(args["app_id"], "org.gimp.GIMP");
-        });
+        assert_tool_args(
+            "install GIMP for photo editing",
+            "install_flatpak",
+            |args| {
+                assert_eq!(args["app_id"], "org.gimp.GIMP");
+            },
+        );
         assert_tool_args("install VLC media player", "install_flatpak", |args| {
             assert_eq!(args["app_id"], "org.videolan.VLC");
         });
@@ -514,14 +585,22 @@ mod tests {
             assert_eq!(args["service"], "docker");
             assert_eq!(args["action"], "stop");
         });
-        assert_tool_args("enable SSH so I can connect remotely", "manage_service", |args| {
-            assert_eq!(args["service"], "sshd");
-            assert_eq!(args["action"], "enable");
-        });
-        assert_tool_args("enable and start the bluetooth service", "manage_service", |args| {
-            assert_eq!(args["service"], "bluetooth");
-            assert_eq!(args["action"], "enable");
-        });
+        assert_tool_args(
+            "enable SSH so I can connect remotely",
+            "manage_service",
+            |args| {
+                assert_eq!(args["service"], "sshd");
+                assert_eq!(args["action"], "enable");
+            },
+        );
+        assert_tool_args(
+            "enable and start the bluetooth service",
+            "manage_service",
+            |args| {
+                assert_eq!(args["service"], "bluetooth");
+                assert_eq!(args["action"], "enable");
+            },
+        );
     }
 
     // ---- check_service_status ----
@@ -531,9 +610,13 @@ mod tests {
         assert_tool_args("is sshd running?", "check_service_status", |args| {
             assert_eq!(args["service"], "sshd");
         });
-        assert_tool_args("check if the cups printing service is running", "check_service_status", |args| {
-            assert_eq!(args["service"], "cups");
-        });
+        assert_tool_args(
+            "check if the cups printing service is running",
+            "check_service_status",
+            |args| {
+                assert_eq!(args["service"], "cups");
+            },
+        );
         assert_tool_args("my printer isn't working", "check_service_status", |args| {
             assert_eq!(args["service"], "cups");
         });
@@ -543,21 +626,37 @@ mod tests {
 
     #[test]
     fn log_queries() {
-        assert_tool_args("show me recent errors in the system log", "read_logs", |args| {
-            assert_eq!(args["priority"], "err");
-        });
-        assert_tool_args("what critical errors happened today?", "read_logs", |args| {
-            assert_eq!(args["priority"], "crit");
-            assert_eq!(args["since"], "today");
-        });
-        assert_tool_args("show me what happened with sshd in the last hour", "read_logs", |args| {
-            assert_eq!(args["unit"], "sshd");
-            assert_eq!(args["since"], "1 hour ago");
-        });
-        assert_tool_args("how many times did sshd fail authentication today?", "read_logs", |args| {
-            assert_eq!(args["unit"], "sshd");
-            assert_eq!(args["since"], "today");
-        });
+        assert_tool_args(
+            "show me recent errors in the system log",
+            "read_logs",
+            |args| {
+                assert_eq!(args["priority"], "err");
+            },
+        );
+        assert_tool_args(
+            "what critical errors happened today?",
+            "read_logs",
+            |args| {
+                assert_eq!(args["priority"], "crit");
+                assert_eq!(args["since"], "today");
+            },
+        );
+        assert_tool_args(
+            "show me what happened with sshd in the last hour",
+            "read_logs",
+            |args| {
+                assert_eq!(args["unit"], "sshd");
+                assert_eq!(args["since"], "1 hour ago");
+            },
+        );
+        assert_tool_args(
+            "how many times did sshd fail authentication today?",
+            "read_logs",
+            |args| {
+                assert_eq!(args["unit"], "sshd");
+                assert_eq!(args["since"], "today");
+            },
+        );
     }
 
     // ---- network_diagnose ----
@@ -577,24 +676,39 @@ mod tests {
 
     #[test]
     fn disk_queries() {
-        assert_tool("my disk is almost full, what's going on?", "check_disk_usage");
-        assert_tool_args("check how much space /home is using", "check_disk_usage", |args| {
-            assert_eq!(args["path"], "/home");
-        });
+        assert_tool(
+            "my disk is almost full, what's going on?",
+            "check_disk_usage",
+        );
+        assert_tool_args(
+            "check how much space /home is using",
+            "check_disk_usage",
+            |args| {
+                assert_eq!(args["path"], "/home");
+            },
+        );
     }
 
     // ---- manage_firewall ----
 
     #[test]
     fn firewall_rules() {
-        assert_tool_args("open port 8080 in the firewall", "manage_firewall", |args| {
-            assert_eq!(args["action"], "allow");
-            assert_eq!(args["port"], "8080/tcp");
-        });
-        assert_tool_args("allow HTTP and HTTPS through the firewall", "manage_firewall", |args| {
-            assert_eq!(args["action"], "allow");
-            assert_eq!(args["service"], "http");
-        });
+        assert_tool_args(
+            "open port 8080 in the firewall",
+            "manage_firewall",
+            |args| {
+                assert_eq!(args["action"], "allow");
+                assert_eq!(args["port"], "8080/tcp");
+            },
+        );
+        assert_tool_args(
+            "allow HTTP and HTTPS through the firewall",
+            "manage_firewall",
+            |args| {
+                assert_eq!(args["action"], "allow");
+                assert_eq!(args["service"], "http");
+            },
+        );
     }
 
     #[test]

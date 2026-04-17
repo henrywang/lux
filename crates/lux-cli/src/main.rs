@@ -58,7 +58,10 @@ async fn main() -> Result<()> {
     let tools = ToolRegistry::new(mode);
     let mut agent = Agent::new(backend, tools);
 
-    eprintln!("lux v{} — AI agent for Linux desktop", env!("CARGO_PKG_VERSION"));
+    eprintln!(
+        "lux v{} — AI agent for Linux desktop",
+        env!("CARGO_PKG_VERSION")
+    );
     eprintln!("System mode: {mode:?}");
     eprintln!("Model: {}", cli.model);
     eprintln!("Type 'quit' to exit, 'clear' to reset conversation.\n");

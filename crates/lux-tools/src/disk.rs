@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use lux_llm::ToolDef;
 use serde_json::Value;
 
-use crate::{run_cmd, Tool};
+use crate::{Tool, run_cmd};
 
 pub struct CheckDiskUsage;
 
@@ -30,10 +30,7 @@ impl Tool for CheckDiskUsage {
     }
 
     async fn execute(&self, args: &Value) -> Result<String> {
-        let path = args
-            .get("path")
-            .and_then(|v| v.as_str())
-            .unwrap_or("/");
+        let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("/");
 
         run_cmd("df", &["-h", path]).await
     }

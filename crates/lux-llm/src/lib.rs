@@ -72,9 +72,5 @@ impl Default for LlmConfig {
 #[trait_variant::make(Send)]
 pub trait LlmBackend {
     /// Send a conversation with tool definitions and get a response.
-    async fn chat(
-        &self,
-        messages: &[Message],
-        tools: &[ToolDef],
-    ) -> Result<LlmResponse>;
+    async fn chat(&self, messages: &[Message], tools: &[ToolDef]) -> Result<LlmResponse>;
 }

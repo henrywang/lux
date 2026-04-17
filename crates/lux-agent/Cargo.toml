@@ -8,7 +8,6 @@ description = "AI agent core - tool calling loop and conversation management"
 [dependencies]
 lux-llm.workspace = true
 lux-tools.workspace = true
-lux-knowledge.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true

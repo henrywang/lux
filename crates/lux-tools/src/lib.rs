@@ -98,8 +98,7 @@ pub enum SystemMode {
 impl SystemMode {
     /// Auto-detect the system mode.
     pub fn detect() -> Self {
-        if std::path::Path::new("/run/bootc").exists()
-            || std::path::Path::new("/sysroot").exists()
+        if std::path::Path::new("/run/bootc").exists() || std::path::Path::new("/sysroot").exists()
         {
             SystemMode::Image
         } else {

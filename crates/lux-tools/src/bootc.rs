@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use lux_llm::ToolDef;
 use serde_json::Value;
 
-use crate::{run_cmd, Tool};
+use crate::{Tool, run_cmd};
 
 pub struct BootcSwitch;
 pub struct BootcRollback;

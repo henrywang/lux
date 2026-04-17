@@ -72,11 +72,7 @@ impl OllamaBackend {
 }
 
 impl LlmBackend for OllamaBackend {
-    async fn chat(
-        &self,
-        messages: &[Message],
-        tools: &[ToolDef],
-    ) -> Result<LlmResponse> {
+    async fn chat(&self, messages: &[Message], tools: &[ToolDef]) -> Result<LlmResponse> {
         let ollama_tools: Vec<OllamaTool> = tools
             .iter()
             .map(|t| OllamaTool {
