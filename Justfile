@@ -16,6 +16,7 @@ fmt:
 lint:
     cargo fmt --all -- --check
     cargo clippy --all-targets -- -D warnings
+    shellcheck install.sh setup.sh .claude/commit-checks.sh
 
 check: lint test
 

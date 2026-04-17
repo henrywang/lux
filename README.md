@@ -52,17 +52,18 @@ Both paths route to the same set of system tools that actually execute operation
 
 ## Install
 
+**Quick install** (prebuilt binary):
+
 ```bash
-# Install ollama
-curl -fsSL https://ollama.com/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/henrywang/lux/main/install.sh | bash
+```
 
-# Clone and build
-git clone https://github.com/lux-linux/lux.git
+**From source:**
+
+```bash
+git clone https://github.com/henrywang/lux.git
 cd lux
-cargo build --release
-
-# Download the fine-tuned model (for LLM fallback path)
-ollama pull henrywang/lux
+./setup.sh
 ```
 
 ## Usage
