@@ -30,14 +30,14 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Check formatting
-        run: cargo fmt --all -- --check
+      - name: Install just
+        uses: extractions/setup-just@v2
 
-      - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
+      - name: Lint (fmt + clippy)
+        run: just lint
 
       - name: Build
-        run: cargo build --release
+        run: just build
 
       - name: Test
-        run: cargo test
+        run: just test

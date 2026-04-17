@@ -82,6 +82,20 @@ ollama pull qwen3:1.7b
 RUST_LOG=debug ./target/release/lux
 ```
 
+## Development
+
+Common tasks are available via [`just`](https://github.com/casey/just):
+
+```bash
+just              # list recipes
+just build        # cargo build --release
+just test         # cargo test
+just lint         # fmt check + clippy
+just check        # lint + test (what CI runs)
+just run -c "install firefox"
+just install      # symlink to ~/.local/bin
+```
+
 ## Project structure
 
 ```
