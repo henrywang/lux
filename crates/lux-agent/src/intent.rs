@@ -261,7 +261,10 @@ fn try_firewall(s: &str) -> Option<ToolCall> {
         return None;
     }
 
-    let action = if s.contains("allow") || s.contains("open") {
+    // "unblock" / "unban" mean drop the existing rule, not add an allow rule.
+    let action = if s.contains("unblock") || s.contains("unban") {
+        "remove"
+    } else if s.contains("allow") || s.contains("open") {
         "allow"
     } else if s.contains("block") || s.contains("deny") || s.contains("ban") || s.contains("close")
     {
@@ -805,6 +808,11 @@ mod tests {
         );
         assert_tool_args("block IP 192.168.1.100", "manage_firewall", |args| {
             assert_eq!(args["action"], "block");
+            assert_eq!(args["source"], "192.168.1.100");
+        });
+        // "unblock" must remove the rule, not re-add it as block or allow.
+        assert_tool_args("unblock IP 192.168.1.100", "manage_firewall", |args| {
+            assert_eq!(args["action"], "remove");
             assert_eq!(args["source"], "192.168.1.100");
         });
     }

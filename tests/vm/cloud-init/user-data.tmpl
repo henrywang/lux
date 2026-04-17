@@ -1,0 +1,23 @@
+#cloud-config
+# Template: __SSH_PUBKEY__ is substituted at render time.
+users:
+  - name: fedora
+    groups: wheel
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - __SSH_PUBKEY__
+
+# SELinux left in default (enforcing). Tests that touch SELinux use permissive
+# explicitly via `setenforce 0` inside the scenario.
+
+# Serial console for debugging boot failures.
+bootcmd:
+  - systemctl enable serial-getty@ttyS0.service
+
+runcmd:
+  - dnf install -y pkexec policycoreutils firewalld flatpak
+  - systemctl enable --now firewalld
+  # Linger so `systemctl --user` units stay alive across SSH sessions.
+  - loginctl enable-linger fedora
+  - touch /tmp/cloud-init-done

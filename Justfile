@@ -17,11 +17,18 @@ lint:
     cargo fmt --all -- --check
     cargo clippy --all-targets -- -D warnings
     shellcheck install.sh setup.sh .claude/commit-checks.sh
+    shellcheck tests/vm/run.sh tests/vm/lib/*.sh tests/vm/scenarios/*.sh
 
 check: lint test
 
 bench:
     python bench/run_bench.py
+
+# Boot an ephemeral Fedora VM and run end-to-end scenarios.
+# Requires: qemu, cloud-utils, ssh. Downloads ~500 MB on first run.
+vm-test:
+    cargo build --release --bin lux --bin luxd
+    bash tests/vm/run.sh
 
 install: build
     mkdir -p ~/.local/bin

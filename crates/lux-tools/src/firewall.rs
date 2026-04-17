@@ -73,23 +73,19 @@ fn build_flag(
             } else {
                 "reject"
             };
-            let filter = match (svc, prt) {
-                (Some(s), _) => format!(" service name=\"{s}\""),
-                (_, Some(p)) => {
-                    let (num, proto) = parse_port(p)?;
-                    format!(" port port=\"{num}\" protocol=\"{proto}\"")
-                }
-                _ => String::new(),
-            };
-            let rule = format!("rule family=\"ipv4\" source address=\"{src}\"{filter} {verb}");
+            let rule = rich_rule(src, svc, prt, verb)?;
             Ok(format!("--add-rich-rule={rule}"))
         }
         // Simple allow: open port or service
         ("allow", None, Some(s), _) => Ok(format!("--add-service={s}")),
         ("allow", None, None, Some(p)) => Ok(format!("--add-port={p}")),
-        // Remove existing rule
-        ("remove", _, Some(s), _) => Ok(format!("--remove-service={s}")),
-        ("remove", _, None, Some(p)) => Ok(format!("--remove-port={p}")),
+        // Remove existing rule by source IP (mirrors the rule `block` added).
+        ("remove", Some(src), svc, prt) => {
+            let rule = rich_rule(src, svc, prt, "reject")?;
+            Ok(format!("--remove-rich-rule={rule}"))
+        }
+        ("remove", None, Some(s), _) => Ok(format!("--remove-service={s}")),
+        ("remove", None, None, Some(p)) => Ok(format!("--remove-port={p}")),
         // Block without source: use rich rule
         ("block", None, Some(s), _) => {
             Ok(format!("--add-rich-rule=rule service name=\"{s}\" reject"))
@@ -107,4 +103,18 @@ fn build_flag(
 fn parse_port(p: &str) -> Result<(&str, &str)> {
     p.split_once('/')
         .ok_or_else(|| anyhow::anyhow!("port must be in 'NUMBER/PROTOCOL' format, got '{p}'"))
+}
+
+fn rich_rule(src: &str, svc: Option<&str>, prt: Option<&str>, verb: &str) -> Result<String> {
+    let filter = match (svc, prt) {
+        (Some(s), _) => format!(" service name=\"{s}\""),
+        (_, Some(p)) => {
+            let (num, proto) = parse_port(p)?;
+            format!(" port port=\"{num}\" protocol=\"{proto}\"")
+        }
+        _ => String::new(),
+    };
+    Ok(format!(
+        "rule family=\"ipv4\" source address=\"{src}\"{filter} {verb}"
+    ))
 }
