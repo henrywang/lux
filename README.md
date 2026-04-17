@@ -1,5 +1,14 @@
 # lux
 
+```
+  ██╗     ██╗   ██╗██╗  ██╗
+  ██║     ██║   ██║╚██╗██╔╝
+  ██║     ██║   ██║ ╚███╔╝
+  ██║     ██║   ██║ ██╔██╗
+  ███████╗╚██████╔╝██╔╝██╗
+  ╚══════╝ ╚═════╝ ╚═╝  ╚═╝
+```
+
 *light for your Linux desktop*
 
 AI agent for Linux desktop. Manages your system through natural language.
