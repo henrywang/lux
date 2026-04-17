@@ -36,6 +36,6 @@ impl Tool for InstallFlatpak {
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("missing 'app_id' argument"))?;
 
-        run_cmd("flatpak", &["install", "-y", "flathub", app_id]).await
+        run_cmd("flatpak", &["install", "-y", "--user", "flathub", app_id]).await
     }
 }

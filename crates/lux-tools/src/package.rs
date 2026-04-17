@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use lux_llm::ToolDef;
 use serde_json::Value;
 
-use crate::{Tool, run_cmd};
+use crate::{Tool, run_cmd_sudo};
 
 pub struct InstallPackage;
 pub struct RemovePackage;
@@ -43,7 +43,7 @@ impl Tool for InstallPackage {
         let pkg_refs: Vec<&str> = packages.iter().map(|s| s.as_str()).collect();
         cmd_args.extend(pkg_refs.iter());
 
-        run_cmd("dnf", &cmd_args).await
+        run_cmd_sudo("dnf", &cmd_args).await
     }
 }
 
@@ -82,6 +82,6 @@ impl Tool for RemovePackage {
         let pkg_refs: Vec<&str> = packages.iter().map(|s| s.as_str()).collect();
         cmd_args.extend(pkg_refs.iter());
 
-        run_cmd("dnf", &cmd_args).await
+        run_cmd_sudo("dnf", &cmd_args).await
     }
 }

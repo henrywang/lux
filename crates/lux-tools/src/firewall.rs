@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use lux_llm::ToolDef;
 use serde_json::Value;
 
-use crate::{Tool, run_cmd};
+use crate::{Tool, run_cmd_sudo};
 
 pub struct ManageFirewall;
 
@@ -16,14 +16,15 @@ impl Tool for ManageFirewall {
     fn definition(&self) -> ToolDef {
         ToolDef {
             name: "manage_firewall".into(),
-            description: "Add or remove firewall rules via firewalld".into(),
+            description: "Manage firewalld rules: allow/block ports, services, or source IPs"
+                .into(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
                     "action": {
                         "type": "string",
-                        "enum": ["allow", "deny"],
-                        "description": "Allow or deny traffic"
+                        "enum": ["allow", "block", "remove"],
+                        "description": "allow: open port/service. block: reject traffic (source IP, port, or service). remove: remove an existing rule."
                     },
                     "service": {
                         "type": "string",
@@ -31,7 +32,11 @@ impl Tool for ManageFirewall {
                     },
                     "port": {
                         "type": "string",
-                        "description": "Port/protocol (e.g. '8080/tcp')"
+                        "description": "Port with protocol (e.g. '8080/tcp')"
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": "Source IP or CIDR to target (e.g. '192.168.1.100' or '10.0.0.0/8')"
                     }
                 },
                 "required": ["action"]
@@ -44,24 +49,62 @@ impl Tool for ManageFirewall {
             .get("action")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("missing 'action' argument"))?;
+        let service = args.get("service").and_then(|v| v.as_str());
+        let port = args.get("port").and_then(|v| v.as_str());
+        let source = args.get("source").and_then(|v| v.as_str());
 
-        let fw_action = match action {
-            "allow" => "--add",
-            "deny" => "--remove",
-            _ => anyhow::bail!("unknown action: {action}"),
-        };
-
-        if let Some(service) = args.get("service").and_then(|v| v.as_str()) {
-            let flag = format!("{fw_action}-service={service}");
-            run_cmd("firewall-cmd", &[&flag, "--permanent"]).await?;
-        } else if let Some(port) = args.get("port").and_then(|v| v.as_str()) {
-            let flag = format!("{fw_action}-port={port}");
-            run_cmd("firewall-cmd", &[&flag, "--permanent"]).await?;
-        } else {
-            anyhow::bail!("must specify 'service' or 'port'");
-        }
-
-        // Reload to apply
-        run_cmd("firewall-cmd", &["--reload"]).await
+        let flag = build_flag(action, service, port, source)?;
+        run_cmd_sudo("firewall-cmd", &[&flag, "--permanent"]).await?;
+        run_cmd_sudo("firewall-cmd", &["--reload"]).await
     }
+}
+
+fn build_flag(
+    action: &str,
+    service: Option<&str>,
+    port: Option<&str>,
+    source: Option<&str>,
+) -> Result<String> {
+    match (action, source, service, port) {
+        // Rich rule: source IP with optional port/service
+        ("allow" | "block", Some(src), svc, prt) => {
+            let verb = if action == "allow" {
+                "accept"
+            } else {
+                "reject"
+            };
+            let filter = match (svc, prt) {
+                (Some(s), _) => format!(" service name=\"{s}\""),
+                (_, Some(p)) => {
+                    let (num, proto) = parse_port(p)?;
+                    format!(" port port=\"{num}\" protocol=\"{proto}\"")
+                }
+                _ => String::new(),
+            };
+            let rule = format!("rule family=\"ipv4\" source address=\"{src}\"{filter} {verb}");
+            Ok(format!("--add-rich-rule={rule}"))
+        }
+        // Simple allow: open port or service
+        ("allow", None, Some(s), _) => Ok(format!("--add-service={s}")),
+        ("allow", None, None, Some(p)) => Ok(format!("--add-port={p}")),
+        // Remove existing rule
+        ("remove", _, Some(s), _) => Ok(format!("--remove-service={s}")),
+        ("remove", _, None, Some(p)) => Ok(format!("--remove-port={p}")),
+        // Block without source: use rich rule
+        ("block", None, Some(s), _) => {
+            Ok(format!("--add-rich-rule=rule service name=\"{s}\" reject"))
+        }
+        ("block", None, None, Some(p)) => {
+            let (num, proto) = parse_port(p)?;
+            Ok(format!(
+                "--add-rich-rule=rule port port=\"{num}\" protocol=\"{proto}\" reject"
+            ))
+        }
+        _ => anyhow::bail!("must specify 'service', 'port', or 'source'"),
+    }
+}
+
+fn parse_port(p: &str) -> Result<(&str, &str)> {
+    p.split_once('/')
+        .ok_or_else(|| anyhow::anyhow!("port must be in 'NUMBER/PROTOCOL' format, got '{p}'"))
 }

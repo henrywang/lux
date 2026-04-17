@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use lux_llm::ToolDef;
 use serde_json::Value;
 
-use crate::{Tool, run_cmd};
+use crate::{Tool, run_cmd, run_cmd_sudo};
 
 pub struct BootcSwitch;
 pub struct BootcRollback;
@@ -38,7 +38,7 @@ impl Tool for BootcSwitch {
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("missing 'image' argument"))?;
 
-        run_cmd("bootc", &["switch", image]).await
+        run_cmd_sudo("bootc", &["switch", image]).await
     }
 }
 
@@ -59,7 +59,7 @@ impl Tool for BootcRollback {
     }
 
     async fn execute(&self, _args: &Value) -> Result<String> {
-        run_cmd("bootc", &["rollback"]).await
+        run_cmd_sudo("bootc", &["rollback"]).await
     }
 }
 

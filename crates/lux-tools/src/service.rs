@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use lux_llm::ToolDef;
 use serde_json::Value;
 
-use crate::{Tool, run_cmd};
+use crate::{Tool, run_cmd_sudo};
 
 pub struct ManageService;
 pub struct CheckServiceStatus;
@@ -46,7 +46,7 @@ impl Tool for ManageService {
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("missing 'action' argument"))?;
 
-        run_cmd("systemctl", &[action, service]).await
+        run_cmd_sudo("systemctl", &[action, service]).await
     }
 }
 

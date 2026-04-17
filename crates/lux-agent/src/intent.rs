@@ -78,6 +78,7 @@ pub fn match_intent(input: &str) -> Option<ToolCall> {
         .or_else(|| try_network(s))
         .or_else(|| try_disk(s))
         .or_else(|| try_logs(s))
+        .or_else(|| try_update(s))
         .or_else(|| try_install(s))
         .or_else(|| try_remove(s))
         .or_else(|| try_service_action(s))
@@ -187,6 +188,25 @@ fn extract_fedora_version(s: &str) -> Option<String> {
     None
 }
 
+fn try_update(s: &str) -> Option<ToolCall> {
+    let is_update = (s.contains("update") || s.contains("upgrade"))
+        && (s.contains("all")
+            || s.contains("packages")
+            || s.contains("system")
+            || s.contains("available")
+            || s.contains("check"));
+    if !is_update {
+        return None;
+    }
+    let check_only = s.contains("check") || s.contains("available") || s.contains("list");
+    let args = if check_only {
+        json!({"check_only": true})
+    } else {
+        json!({})
+    };
+    Some(tool_call("update_system", args))
+}
+
 fn try_firewall(s: &str) -> Option<ToolCall> {
     // "disable / turn off / stop the firewall" → manage_service(firewalld, disable/stop)
     if s.contains("firewall") {
@@ -210,9 +230,11 @@ fn try_firewall(s: &str) -> Option<ToolCall> {
         }
     }
 
-    // Port / service firewall rules
+    // Port / service / IP firewall rules
+    let ip = extract_ip(s);
     let has_firewall_intent = s.contains("firewall")
         || s.contains("port")
+        || ip.is_some() && (s.contains("block") || s.contains("allow") || s.contains("ban"))
         || (s.contains("allow") && (s.contains("through") || s.contains("traffic")))
         || (s.contains("block") && s.contains("port"))
         || (s.contains("open") && s.contains("port"));
@@ -223,8 +245,9 @@ fn try_firewall(s: &str) -> Option<ToolCall> {
 
     let action = if s.contains("allow") || s.contains("open") {
         "allow"
-    } else if s.contains("block") || s.contains("deny") || s.contains("close") {
-        "deny"
+    } else if s.contains("block") || s.contains("deny") || s.contains("ban") || s.contains("close")
+    {
+        "block"
     } else {
         return None;
     };
@@ -232,12 +255,14 @@ fn try_firewall(s: &str) -> Option<ToolCall> {
     let mut args = serde_json::Map::new();
     args.insert("action".into(), json!(action));
 
-    // Port number: look for digits that look like port numbers
+    if let Some(src) = ip {
+        args.insert("source".into(), json!(src));
+    }
+
     if let Some(port) = extract_port(s) {
         args.insert("port".into(), json!(port));
     }
 
-    // Named services
     for svc in ["http", "https", "ssh", "dns", "smtp", "ftp", "nfs"] {
         if s.contains(svc) {
             args.insert("service".into(), json!(svc));
@@ -246,6 +271,19 @@ fn try_firewall(s: &str) -> Option<ToolCall> {
     }
 
     Some(tool_call("manage_firewall", Value::Object(args)))
+}
+
+fn extract_ip(s: &str) -> Option<String> {
+    s.split_whitespace().find_map(|w| {
+        let w = w.trim_matches(|c: char| !c.is_ascii_digit() && c != '.' && c != '/');
+        let ip_part = w.split('/').next()?;
+        let octets: Vec<&str> = ip_part.split('.').collect();
+        if octets.len() == 4 && octets.iter().all(|o| o.parse::<u8>().is_ok()) {
+            Some(w.to_string())
+        } else {
+            None
+        }
+    })
 }
 
 fn extract_port(s: &str) -> Option<String> {
@@ -709,6 +747,19 @@ mod tests {
                 assert_eq!(args["service"], "http");
             },
         );
+        assert_tool_args("block IP 192.168.1.100", "manage_firewall", |args| {
+            assert_eq!(args["action"], "block");
+            assert_eq!(args["source"], "192.168.1.100");
+        });
+    }
+
+    #[test]
+    fn system_update() {
+        assert_tool_args("update all packages", "update_system", |_| {});
+        assert_tool_args("upgrade the system", "update_system", |_| {});
+        assert_tool_args("check for available updates", "update_system", |args| {
+            assert_eq!(args["check_only"], true);
+        });
     }
 
     #[test]

@@ -12,6 +12,7 @@ mod network;
 mod package;
 mod service;
 mod shell;
+mod update;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -27,6 +28,7 @@ pub use network::*;
 pub use package::*;
 pub use service::*;
 pub use shell::*;
+pub use update::*;
 
 /// A tool that can be executed by the agent.
 #[async_trait]
@@ -52,6 +54,7 @@ impl ToolRegistry {
         let mut tools: Vec<Box<dyn Tool>> = vec![
             Box::new(package::InstallPackage),
             Box::new(package::RemovePackage),
+            Box::new(update::UpdateSystem),
             Box::new(flatpak::InstallFlatpak),
             Box::new(service::ManageService),
             Box::new(service::CheckServiceStatus),
@@ -126,4 +129,15 @@ pub(crate) async fn run_cmd(cmd: &str, args: &[&str]) -> Result<String> {
     } else {
         Ok(stdout)
     }
+}
+
+/// Run a privileged command via pkexec (polkit). Prompts the user with a
+/// desktop password dialog. If already running as root, runs directly.
+pub(crate) async fn run_cmd_sudo(cmd: &str, args: &[&str]) -> Result<String> {
+    if unsafe { libc::geteuid() } == 0 {
+        return run_cmd(cmd, args).await;
+    }
+    let mut full_args = vec![cmd];
+    full_args.extend_from_slice(args);
+    run_cmd("pkexec", &full_args).await
 }
