@@ -12,7 +12,7 @@ use tracing_subscriber::EnvFilter;
 #[command(name = "lux", about = "AI agent for Linux desktop")]
 struct Cli {
     /// Model to use
-    #[arg(long, default_value = "qwen3:1.7b")]
+    #[arg(long, default_value = "henrywang/lux")]
     model: String,
 
     /// Ollama server URL

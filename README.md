@@ -61,9 +61,8 @@ git clone https://github.com/lux-linux/lux.git
 cd lux
 cargo build --release
 
-# Download the fine-tuned model (optional, for LLM fallback)
-# See finetune/README.md for training your own
-ollama pull qwen3:1.7b
+# Download the fine-tuned model (for LLM fallback path)
+ollama pull henrywang/lux
 ```
 
 ## Usage

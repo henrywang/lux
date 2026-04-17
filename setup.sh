@@ -23,9 +23,9 @@ if ! command -v ollama &>/dev/null; then
     curl -fsSL https://ollama.com/install.sh | sh
 fi
 
-# Pull base model
-echo "Pulling Qwen3 1.7B model..."
-ollama pull qwen3:1.7b
+# Pull fine-tuned model
+echo "Pulling henrywang/lux model..."
+ollama pull henrywang/lux
 
 # Build lux
 echo "Building lux..."
