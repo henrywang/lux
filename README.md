@@ -1,15 +1,18 @@
 # lux
 
 ```
-  ██╗     ██╗   ██╗██╗  ██╗
-  ██║     ██║   ██║╚██╗██╔╝
-  ██║     ██║   ██║ ╚███╔╝
-  ██║     ██║   ██║ ██╔██╗
-  ███████╗╚██████╔╝██╔╝██╗
-  ╚══════╝ ╚═════╝ ╚═╝  ╚═╝
+  ██╗     ██╗   ██╗██╗  ██╗         ╭─ System ───────────────────────────────────╮
+  ██║     ██║   ██║╚██╗██╔╝         │ Host:    Fedora Linux 43 (bare-metal)      │
+  ██║     ██║   ██║ ╚███╔╝          │ CPU:     AMD Ryzen 5 5600H (12 cores)      │
+  ██║     ██║   ██║ ██╔██╗          │ Memory:  21.7 / 30.7 GB available          │
+  ███████╗╚██████╔╝██╔╝██╗          │ Disk /:  903 GB free of 951 GB             │
+  ╚══════╝ ╚═════╝ ╚═╝  ╚═╝         │ Network: WIFI 192.168.50.62                │
+                                    │ VPN:     IPsec                             │
+  light for your Linux desktop      │ Uptime:  11h 50m                           │
+  lux v0.1.0                        │ Mode:    package                           │
+  Model:   henrywang/lux            │ Issues:  none                              │
+  Ollama:  http://localhost:11434   ╰────────────────────────────────────────────╯
 ```
-
-*light for your Linux desktop*
 
 AI agent for Linux desktop. Manages your system through natural language.
 
