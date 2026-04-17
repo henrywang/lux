@@ -8,7 +8,7 @@ mod intent;
 
 use anyhow::Result;
 use lux_llm::{LlmBackend, LlmResponse, Message, Role, ToolCall};
-use lux_tools::ToolRegistry;
+use lux_tools::{SystemMode, ToolRegistry};
 use tracing::{debug, info};
 
 /// Maximum tool call rounds before stopping (prevents infinite loops).
@@ -18,11 +18,12 @@ const MAX_ROUNDS: usize = 10;
 pub struct Agent<B: LlmBackend> {
     backend: B,
     tools: ToolRegistry,
+    mode: SystemMode,
     history: Vec<Message>,
 }
 
 impl<B: LlmBackend> Agent<B> {
-    pub fn new(backend: B, tools: ToolRegistry) -> Self {
+    pub fn new(backend: B, tools: ToolRegistry, mode: SystemMode) -> Self {
         let system_msg = Message {
             role: Role::System,
             content: Some(
@@ -46,6 +47,7 @@ impl<B: LlmBackend> Agent<B> {
         Self {
             backend,
             tools,
+            mode,
             history: vec![system_msg],
         }
     }
@@ -53,7 +55,7 @@ impl<B: LlmBackend> Agent<B> {
     /// Process a user message and return the agent's final text response.
     pub async fn process(&mut self, user_input: &str) -> Result<String> {
         // Fast path: rule-based intent matching (instant, no LLM call)
-        if let Some(tc) = intent::match_intent(user_input) {
+        if let Some(tc) = intent::match_intent(user_input, self.mode) {
             info!("Intent matched: {} args={}", tc.name, tc.arguments);
             return Ok(self.execute_tool(&tc).await);
         }

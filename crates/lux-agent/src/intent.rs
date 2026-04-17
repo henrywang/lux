@@ -5,35 +5,53 @@
 //! Conservative by design — a missed match is better than a wrong match.
 
 use lux_llm::ToolCall;
+use lux_tools::SystemMode;
 use serde_json::{Value, json};
 
-/// Known GUI apps → Flatpak app IDs.
-const FLATPAK_APPS: &[(&str, &str)] = &[
-    ("firefox", "org.mozilla.firefox"),
-    ("thunderbird", "org.mozilla.Thunderbird"),
-    ("gimp", "org.gimp.GIMP"),
-    ("inkscape", "org.inkscape.Inkscape"),
-    ("vlc", "org.videolan.VLC"),
-    ("audacity", "org.audacityteam.Audacity"),
-    ("kdenlive", "org.kde.kdenlive"),
-    ("handbrake", "fr.handbrake.ghb"),
-    ("steam", "com.valvesoftware.Steam"),
-    ("discord", "com.discordapp.Discord"),
-    ("slack", "com.slack.Slack"),
-    ("zoom", "us.zoom.Zoom"),
-    ("spotify", "com.spotify.Client"),
-    ("signal", "org.signal.Signal"),
-    ("telegram", "org.telegram.desktop"),
-    ("obs studio", "com.obsproject.Studio"),
-    ("obs", "com.obsproject.Studio"),
-    ("blender", "org.blender.Blender"),
-    ("libreoffice", "org.libreoffice.LibreOffice"),
-    ("calibre", "com.calibre_ebook.calibre"),
-    ("vs code", "com.visualstudio.code"),
-    ("vscode", "com.visualstudio.code"),
-    ("visual studio code", "com.visualstudio.code"),
-    ("chromium", "org.chromium.Chromium"),
-    ("chrome", "com.google.Chrome"),
+/// Known GUI apps.
+/// (user-typed name, flatpak app ID, optional Fedora dnf package name)
+/// If a dnf package is set and we're in Package mode, use dnf. Otherwise flatpak.
+const GUI_APPS: &[(&str, &str, Option<&str>)] = &[
+    ("firefox", "org.mozilla.firefox", Some("firefox")),
+    (
+        "thunderbird",
+        "org.mozilla.Thunderbird",
+        Some("thunderbird"),
+    ),
+    ("gimp", "org.gimp.GIMP", Some("gimp")),
+    ("inkscape", "org.inkscape.Inkscape", Some("inkscape")),
+    ("vlc", "org.videolan.VLC", Some("vlc")),
+    ("audacity", "org.audacityteam.Audacity", Some("audacity")),
+    ("kdenlive", "org.kde.kdenlive", Some("kdenlive")),
+    ("blender", "org.blender.Blender", Some("blender")),
+    (
+        "libreoffice",
+        "org.libreoffice.LibreOffice",
+        Some("libreoffice"),
+    ),
+    ("calibre", "com.calibre_ebook.calibre", Some("calibre")),
+    ("chromium", "org.chromium.Chromium", Some("chromium")),
+    ("obs studio", "com.obsproject.Studio", Some("obs-studio")),
+    ("obs", "com.obsproject.Studio", Some("obs-studio")),
+    ("telegram", "org.telegram.desktop", Some("telegram-desktop")),
+    // Flatpak-only (not in Fedora main repos)
+    ("handbrake", "fr.handbrake.ghb", None),
+    ("steam", "com.valvesoftware.Steam", None),
+    ("discord", "com.discordapp.Discord", None),
+    ("slack", "com.slack.Slack", None),
+    ("zoom", "us.zoom.Zoom", None),
+    ("spotify", "com.spotify.Client", None),
+    ("signal", "org.signal.Signal", None),
+    ("vs code", "com.visualstudio.code", None),
+    ("vscode", "com.visualstudio.code", None),
+    ("visual studio code", "com.visualstudio.code", None),
+    ("chrome", "com.google.Chrome", None),
+    ("zed", "dev.zed.Zed", None),
+    ("sublime text", "com.sublimetext.three", None),
+    ("sublime", "com.sublimetext.three", None),
+    ("bitwarden", "com.bitwarden.desktop", None),
+    ("obsidian", "md.obsidian.Obsidian", None),
+    ("postman", "com.getpostman.Postman", None),
 ];
 
 /// Known service name aliases (user term → systemd unit).
@@ -68,7 +86,7 @@ fn tool_call(name: &str, args: Value) -> ToolCall {
 }
 
 /// Try to match user input to a tool call without the LLM.
-pub fn match_intent(input: &str) -> Option<ToolCall> {
+pub fn match_intent(input: &str, mode: SystemMode) -> Option<ToolCall> {
     let s = input.to_lowercase();
     let s = s.trim();
 
@@ -79,7 +97,7 @@ pub fn match_intent(input: &str) -> Option<ToolCall> {
         .or_else(|| try_disk(s))
         .or_else(|| try_logs(s))
         .or_else(|| try_update(s))
-        .or_else(|| try_install(s))
+        .or_else(|| try_install(s, mode))
         .or_else(|| try_remove(s))
         .or_else(|| try_service_action(s))
         .or_else(|| try_service_status(s))
@@ -413,7 +431,7 @@ fn extract_minutes(s: &str) -> Option<u32> {
     None
 }
 
-fn try_install(s: &str) -> Option<ToolCall> {
+fn try_install(s: &str, mode: SystemMode) -> Option<ToolCall> {
     // "uninstall" and "installed" are not install commands
     if s.contains("uninstall") || s.contains("installed") {
         return None;
@@ -422,10 +440,16 @@ fn try_install(s: &str) -> Option<ToolCall> {
         return None;
     }
 
-    // Check known GUI apps → install_flatpak
-    for (name, app_id) in FLATPAK_APPS {
+    // Known GUI apps: prefer dnf on package-mode Fedora when available,
+    // otherwise use flatpak.
+    for (name, app_id, dnf_pkg) in GUI_APPS {
         if s.contains(name) {
-            return Some(tool_call("install_flatpak", json!({"app_id": app_id})));
+            return match (mode, dnf_pkg) {
+                (SystemMode::Package, Some(pkg)) => {
+                    Some(tool_call("install_package", json!({"packages": [pkg]})))
+                }
+                _ => Some(tool_call("install_flatpak", json!({"app_id": app_id}))),
+            };
         }
     }
 
@@ -546,43 +570,75 @@ mod tests {
     use super::*;
 
     fn assert_tool(input: &str, expected_tool: &str) {
-        let result = match_intent(input).unwrap_or_else(|| panic!("no match for: {input:?}"));
+        let result = match_intent(input, SystemMode::Package)
+            .unwrap_or_else(|| panic!("no match for: {input:?}"));
         assert_eq!(result.name, expected_tool, "wrong tool for: {input:?}");
     }
 
     fn assert_tool_args(input: &str, expected_tool: &str, check: impl FnOnce(&Value)) {
-        let result = match_intent(input).unwrap_or_else(|| panic!("no match for: {input:?}"));
+        let result = match_intent(input, SystemMode::Package)
+            .unwrap_or_else(|| panic!("no match for: {input:?}"));
+        assert_eq!(result.name, expected_tool, "wrong tool for: {input:?}");
+        check(&result.arguments);
+    }
+
+    fn assert_tool_args_mode(
+        input: &str,
+        mode: SystemMode,
+        expected_tool: &str,
+        check: impl FnOnce(&Value),
+    ) {
+        let result = match_intent(input, mode).unwrap_or_else(|| panic!("no match for: {input:?}"));
         assert_eq!(result.name, expected_tool, "wrong tool for: {input:?}");
         check(&result.arguments);
     }
 
     fn assert_no_match(input: &str) {
         assert!(
-            match_intent(input).is_none(),
+            match_intent(input, SystemMode::Package).is_none(),
             "unexpected match for: {input:?}"
         );
     }
 
-    // ---- install_flatpak ----
+    // ---- install_flatpak vs install_package (GUI apps) ----
 
     #[test]
-    fn install_gui_apps() {
-        assert_tool_args("install firefox", "install_flatpak", |args| {
-            assert_eq!(args["app_id"], "org.mozilla.firefox");
+    fn install_gui_apps_package_mode() {
+        // Apps in Fedora repos should use dnf on package-mode systems.
+        assert_tool_args("install firefox", "install_package", |args| {
+            assert_eq!(args["packages"][0], "firefox");
         });
-        assert_tool_args(
-            "install GIMP for photo editing",
+        assert_tool_args("install VLC media player", "install_package", |args| {
+            assert_eq!(args["packages"][0], "vlc");
+        });
+        // Apps not in Fedora repos must use flatpak.
+        assert_tool_args("install steam", "install_flatpak", |args| {
+            assert_eq!(args["app_id"], "com.valvesoftware.Steam");
+        });
+        assert_tool_args("install vscode", "install_flatpak", |args| {
+            assert_eq!(args["app_id"], "com.visualstudio.code");
+        });
+    }
+
+    #[test]
+    fn install_gui_apps_image_mode() {
+        // Image-mode (bootc) systems always use flatpak.
+        assert_tool_args_mode(
+            "install firefox",
+            SystemMode::Image,
+            "install_flatpak",
+            |args| {
+                assert_eq!(args["app_id"], "org.mozilla.firefox");
+            },
+        );
+        assert_tool_args_mode(
+            "install gimp",
+            SystemMode::Image,
             "install_flatpak",
             |args| {
                 assert_eq!(args["app_id"], "org.gimp.GIMP");
             },
         );
-        assert_tool_args("install VLC media player", "install_flatpak", |args| {
-            assert_eq!(args["app_id"], "org.videolan.VLC");
-        });
-        assert_tool_args("install steam", "install_flatpak", |args| {
-            assert_eq!(args["app_id"], "com.valvesoftware.Steam");
-        });
     }
 
     // ---- install_package ----

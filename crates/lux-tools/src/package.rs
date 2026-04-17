@@ -43,7 +43,37 @@ impl Tool for InstallPackage {
         let pkg_refs: Vec<&str> = packages.iter().map(|s| s.as_str()).collect();
         cmd_args.extend(pkg_refs.iter());
 
-        run_cmd_sudo("dnf", &cmd_args).await
+        match run_cmd_sudo("dnf", &cmd_args).await {
+            Ok(out) => Ok(out),
+            Err(e) if e.to_string().contains("No match for argument") => {
+                try_flatpak_fallback(&packages, e).await
+            }
+            Err(e) => Err(e),
+        }
+    }
+}
+
+/// If dnf can't find a package, try searching Flathub by name.
+/// Returns the original dnf error if no flatpak match is found.
+async fn try_flatpak_fallback(packages: &[String], dnf_err: anyhow::Error) -> Result<String> {
+    use crate::run_cmd;
+    let pkg = packages.first().ok_or(dnf_err)?;
+    let search = run_cmd("flatpak", &["search", "--columns=application", pkg])
+        .await
+        .unwrap_or_default();
+    let app_id = search
+        .lines()
+        .find(|l| {
+            let l = l.trim().to_lowercase();
+            !l.is_empty() && l.contains(&pkg.to_lowercase())
+        })
+        .map(str::trim);
+    if let Some(app_id) = app_id {
+        run_cmd("flatpak", &["install", "-y", "--user", "flathub", app_id]).await
+    } else {
+        anyhow::bail!(
+            "'{pkg}' not found in dnf or flathub. Try a different name, or install manually."
+        )
     }
 }
 

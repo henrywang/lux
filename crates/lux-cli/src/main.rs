@@ -56,7 +56,7 @@ async fn main() -> Result<()> {
 
     let backend = OllamaBackend::new(config);
     let tools = ToolRegistry::new(mode);
-    let mut agent = Agent::new(backend, tools);
+    let mut agent = Agent::new(backend, tools, mode);
 
     eprintln!(
         "lux v{} — AI agent for Linux desktop",
