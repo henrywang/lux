@@ -1,0 +1,40 @@
+#!/bin/bash
+# lux setup script for Fedora
+set -euo pipefail
+
+echo "=== lux setup ==="
+
+# Check Fedora
+if ! command -v dnf &>/dev/null; then
+    echo "Error: dnf not found. This script is for Fedora."
+    exit 1
+fi
+
+# Install Rust if needed
+if ! command -v cargo &>/dev/null; then
+    echo "Installing Rust..."
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    source "$HOME/.cargo/env"
+fi
+
+# Install ollama if needed
+if ! command -v ollama &>/dev/null; then
+    echo "Installing ollama..."
+    curl -fsSL https://ollama.com/install.sh | sh
+fi
+
+# Pull base model
+echo "Pulling Qwen3 1.7B model..."
+ollama pull qwen3:1.7b
+
+# Build lux
+echo "Building lux..."
+cargo build --release
+
+# Symlink to ~/.local/bin
+mkdir -p "$HOME/.local/bin"
+ln -sf "$(pwd)/target/release/lux" "$HOME/.local/bin/lux"
+
+echo ""
+echo "=== Setup complete ==="
+echo "Run 'lux' to start (make sure ~/.local/bin is in your PATH)"

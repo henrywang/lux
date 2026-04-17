@@ -1,0 +1,235 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "install_package",
+      "description": "Install a system package via dnf (package mode) or add to image (image mode)",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "packages": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Package names to install"
+          }
+        },
+        "required": ["packages"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "remove_package",
+      "description": "Remove a system package",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "packages": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Package names to remove"
+          }
+        },
+        "required": ["packages"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "install_flatpak",
+      "description": "Install a desktop application via Flatpak",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "app_id": {
+            "type": "string",
+            "description": "Flatpak application ID (e.g. org.mozilla.firefox)"
+          }
+        },
+        "required": ["app_id"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "manage_service",
+      "description": "Start, stop, enable, disable, or restart a systemd service",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string",
+            "description": "Service name (e.g. bluetooth, cups, sshd)"
+          },
+          "action": {
+            "type": "string",
+            "enum": ["start", "stop", "enable", "disable", "restart"],
+            "description": "Action to perform on the service"
+          }
+        },
+        "required": ["service", "action"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "check_service_status",
+      "description": "Check the status of a systemd service",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string",
+            "description": "Service name to check"
+          }
+        },
+        "required": ["service"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "read_logs",
+      "description": "Read system logs from journalctl, optionally filtered by unit or time",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "unit": {
+            "type": "string",
+            "description": "Filter logs by systemd unit name"
+          },
+          "since": {
+            "type": "string",
+            "description": "Show logs since this time (e.g. '1 hour ago', 'today')"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["emerg", "alert", "crit", "err", "warning", "notice", "info", "debug"],
+            "description": "Minimum priority level"
+          },
+          "lines": {
+            "type": "integer",
+            "description": "Number of recent lines to return"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "check_disk_usage",
+      "description": "Check disk space usage on the system",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path to check (defaults to /)"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "manage_firewall",
+      "description": "Add or remove firewall rules via firewalld",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["allow", "deny"],
+            "description": "Allow or deny traffic"
+          },
+          "service": {
+            "type": "string",
+            "description": "Service name (e.g. ssh, http, https)"
+          },
+          "port": {
+            "type": "string",
+            "description": "Port/protocol (e.g. '8080/tcp')"
+          }
+        },
+        "required": ["action"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "network_diagnose",
+      "description": "Diagnose network connectivity issues",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "interface": {
+            "type": "string",
+            "description": "Network interface to diagnose (e.g. wifi, ethernet)"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "bootc_switch",
+      "description": "Switch to a different bootc image (image mode only)",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "image": {
+            "type": "string",
+            "description": "OCI image reference to switch to"
+          }
+        },
+        "required": ["image"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "bootc_rollback",
+      "description": "Rollback to the previous bootc image (image mode only)",
+      "parameters": {
+        "type": "object"
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "bootc_status",
+      "description": "Show current bootc image status and available updates",
+      "parameters": {
+        "type": "object"
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "run_command",
+      "description": "Run an arbitrary shell command when no specific tool fits. Use as last resort.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "Shell command to execute"
+          }
+        },
+        "required": ["command"]
+      }
+    }
+  }
+]

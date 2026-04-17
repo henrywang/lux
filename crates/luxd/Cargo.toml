@@ -1,0 +1,17 @@
+[package]
+name = "luxd"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "lux daemon - systemd service for the AI agent"
+
+[dependencies]
+lux-agent.workspace = true
+lux-llm.workspace = true
+lux-tools.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

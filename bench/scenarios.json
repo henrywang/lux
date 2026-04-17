@@ -1,0 +1,215 @@
+[
+  {
+    "id": 1,
+    "input": "install firefox",
+    "expected_tool": "install_flatpak",
+    "expected_args_contain": { "app_id": "firefox" },
+    "category": "package_management",
+    "note": "Desktop app should prefer flatpak"
+  },
+  {
+    "id": 2,
+    "input": "install vim",
+    "expected_tool": "install_package",
+    "expected_args_contain": { "packages": ["vim"] },
+    "category": "package_management",
+    "note": "CLI tool should use system package"
+  },
+  {
+    "id": 3,
+    "input": "my bluetooth headphones won't connect",
+    "expected_tool": "check_service_status",
+    "expected_args_contain": { "service": "bluetooth" },
+    "category": "diagnosis",
+    "note": "Should check bluetooth service first"
+  },
+  {
+    "id": 4,
+    "input": "enable SSH so I can connect remotely",
+    "expected_tool": "manage_service",
+    "expected_args_contain": { "service": "sshd", "action": "enable" },
+    "category": "service_management"
+  },
+  {
+    "id": 5,
+    "input": "my disk is almost full, what's going on?",
+    "expected_tool": "check_disk_usage",
+    "category": "diagnosis"
+  },
+  {
+    "id": 6,
+    "input": "I need to run a web server on port 8080, open the firewall",
+    "expected_tool": "manage_firewall",
+    "expected_args_contain": { "action": "allow", "port": "8080/tcp" },
+    "category": "firewall"
+  },
+  {
+    "id": 7,
+    "input": "wifi is not working",
+    "expected_tool": "network_diagnose",
+    "expected_args_contain": { "interface": "wifi" },
+    "category": "diagnosis"
+  },
+  {
+    "id": 8,
+    "input": "show me recent errors in the system log",
+    "expected_tool": "read_logs",
+    "expected_args_contain": { "priority": "err" },
+    "category": "logs"
+  },
+  {
+    "id": 9,
+    "input": "restart nginx",
+    "expected_tool": "manage_service",
+    "expected_args_contain": { "service": "nginx", "action": "restart" },
+    "category": "service_management"
+  },
+  {
+    "id": 10,
+    "input": "remove libreoffice",
+    "expected_tool": "remove_package",
+    "expected_args_contain": { "packages": ["libreoffice"] },
+    "category": "package_management"
+  },
+  {
+    "id": 11,
+    "input": "the last update broke my system, go back",
+    "expected_tool": "bootc_rollback",
+    "category": "bootc"
+  },
+  {
+    "id": 12,
+    "input": "what image am I running?",
+    "expected_tool": "bootc_status",
+    "category": "bootc"
+  },
+  {
+    "id": 13,
+    "input": "install GIMP for photo editing",
+    "expected_tool": "install_flatpak",
+    "expected_args_contain": { "app_id": "gimp" },
+    "category": "package_management",
+    "note": "Desktop app should prefer flatpak"
+  },
+  {
+    "id": 14,
+    "input": "I need git and gcc for development",
+    "expected_tool": "install_package",
+    "expected_args_contain": { "packages": ["git", "gcc"] },
+    "category": "package_management",
+    "note": "Dev tools should be system packages"
+  },
+  {
+    "id": 15,
+    "input": "check if the cups printing service is running",
+    "expected_tool": "check_service_status",
+    "expected_args_contain": { "service": "cups" },
+    "category": "service_management"
+  },
+  {
+    "id": 16,
+    "input": "allow HTTP and HTTPS through the firewall",
+    "expected_tool": "manage_firewall",
+    "expected_args_contain": { "action": "allow" },
+    "category": "firewall"
+  },
+  {
+    "id": 17,
+    "input": "show me what happened with sshd in the last hour",
+    "expected_tool": "read_logs",
+    "expected_args_contain": { "unit": "sshd" },
+    "category": "logs"
+  },
+  {
+    "id": 18,
+    "input": "stop the docker service",
+    "expected_tool": "manage_service",
+    "expected_args_contain": { "service": "docker", "action": "stop" },
+    "category": "service_management"
+  },
+  {
+    "id": 19,
+    "input": "switch to the fedora 41 image",
+    "expected_tool": "bootc_switch",
+    "expected_args_contain": { "image": "fedora" },
+    "category": "bootc"
+  },
+  {
+    "id": 20,
+    "input": "install steam",
+    "expected_tool": "install_flatpak",
+    "expected_args_contain": { "app_id": "steam" },
+    "category": "package_management",
+    "note": "Gaming app should prefer flatpak"
+  },
+  {
+    "id": 21,
+    "input": "install htop and tmux",
+    "expected_tool": "install_package",
+    "expected_args_contain": { "packages": ["htop", "tmux"] },
+    "category": "package_management"
+  },
+  {
+    "id": 22,
+    "input": "my printer isn't working",
+    "expected_tool": "check_service_status",
+    "expected_args_contain": { "service": "cups" },
+    "category": "diagnosis"
+  },
+  {
+    "id": 23,
+    "input": "disable the firewall",
+    "expected_tool": "manage_service",
+    "expected_args_contain": { "service": "firewalld", "action": "disable" },
+    "category": "firewall",
+    "note": "Disabling firewall = disabling firewalld service"
+  },
+  {
+    "id": 24,
+    "input": "check how much space /home is using",
+    "expected_tool": "check_disk_usage",
+    "expected_args_contain": { "path": "/home" },
+    "category": "diagnosis"
+  },
+  {
+    "id": 25,
+    "input": "what critical errors happened today?",
+    "expected_tool": "read_logs",
+    "expected_args_contain": { "priority": "crit", "since": "today" },
+    "category": "logs"
+  },
+  {
+    "id": 26,
+    "input": "install VLC media player",
+    "expected_tool": "install_flatpak",
+    "expected_args_contain": { "app_id": "vlc" },
+    "category": "package_management"
+  },
+  {
+    "id": 27,
+    "input": "I can't reach the internet",
+    "expected_tool": "network_diagnose",
+    "category": "diagnosis"
+  },
+  {
+    "id": 28,
+    "input": "enable and start the bluetooth service",
+    "expected_tool": "manage_service",
+    "expected_args_contain": { "service": "bluetooth", "action": "enable" },
+    "category": "service_management"
+  },
+  {
+    "id": 29,
+    "input": "install python3 and pip",
+    "expected_tool": "install_package",
+    "expected_args_contain": { "packages": ["python3"] },
+    "category": "package_management"
+  },
+  {
+    "id": 30,
+    "input": "how many times did sshd fail authentication today?",
+    "expected_tool": "read_logs",
+    "expected_args_contain": { "unit": "sshd" },
+    "category": "logs"
+  }
+]

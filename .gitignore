@@ -1,0 +1,4 @@
+/target
+finetune/output/
+*.gguf
+.env
