@@ -16,7 +16,18 @@ bootcmd:
   - systemctl enable serial-getty@ttyS0.service
 
 runcmd:
-  - dnf install -y pkexec policycoreutils firewalld flatpak
+  # dnf install is a no-op on bootc (packages baked into the image via
+  # tests/vm/bootc/Containerfile) and a real install on cloud.
+  - dnf install -y pkexec policycoreutils firewalld flatpak || true
+  # Adding the flathub remote in cloud-init is more reliable than at image
+  # build time: bootc does not guarantee /var content survives `bootc install`.
+  # Added at both scopes: --system for system-wide, --user (running as root
+  # here) for root's user scope — that's what `sudo lux` uses because lux's
+  # install_flatpak calls `flatpak install --user`.
+  - flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+  - flatpak remote-add --user   --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+  - flatpak remotes --system > /tmp/flatpak-remotes.log 2>&1 || true
+  - flatpak remotes --user  >> /tmp/flatpak-remotes.log 2>&1 || true
   - systemctl enable --now firewalld
   # Linger so `systemctl --user` units stay alive across SSH sessions.
   - loginctl enable-linger fedora
