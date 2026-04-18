@@ -3,12 +3,12 @@
 //! Provides a trait-based abstraction over LLM backends (ollama, llama.cpp)
 //! and manages model lifecycle (load on demand, unload after idle).
 
-mod ollama;
+mod openai;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-pub use ollama::OllamaBackend;
+pub use openai::OpenAiBackend;
 
 /// A tool definition passed to the LLM for function calling.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,7 +55,6 @@ pub struct LlmResponse {
 pub struct LlmConfig {
     pub model: String,
     pub base_url: String,
-    pub thinking: bool,
 }
 
 impl Default for LlmConfig {
@@ -63,7 +62,6 @@ impl Default for LlmConfig {
         Self {
             model: "hf.co/henrywangxf/lux".to_string(),
             base_url: "http://localhost:11434".to_string(),
-            thinking: false,
         }
     }
 }
