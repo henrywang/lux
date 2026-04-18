@@ -6,8 +6,13 @@ on:
 
 jobs:
   vm:
+    name: vm (${{ matrix.target }})
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [cloud, bootc]
     steps:
       - uses: actions/checkout@v6
 
@@ -16,6 +21,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y qemu-system-x86 qemu-utils cloud-image-utils openssh-client
 
+      - name: Install podman (bootc only)
+        if: matrix.target == 'bootc'
+        run: |
+          sudo apt-get install -y podman
+
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
@@ -23,12 +33,12 @@ jobs:
         run: cargo build --release --bin lux --bin luxd
 
       - name: Run VM scenarios
-        run: sudo -E bash tests/vm/run.sh
+        run: sudo -E VM_TARGET=${{ matrix.target }} bash tests/vm/run.sh
 
       - name: Upload VM serial log on failure
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: vm-serial-log
+          name: vm-serial-log-${{ matrix.target }}
           path: /tmp/lux-vm-*.log
           if-no-files-found: ignore

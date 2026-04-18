@@ -7,6 +7,8 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 
 : "${SSH_PORT:=2222}"
+: "${VM_TARGET:=cloud}"
+export VM_TARGET
 
 # --- preflight ---
 for cmd in qemu-system-x86_64 qemu-img cloud-localds ssh scp curl; do
@@ -17,6 +19,13 @@ for cmd in qemu-system-x86_64 qemu-img cloud-localds ssh scp curl; do
         exit 2
     fi
 done
+
+if [ "$VM_TARGET" = "bootc" ]; then
+    if ! command -v podman >/dev/null; then
+        echo "VM_TARGET=bootc requires podman" >&2
+        exit 2
+    fi
+fi
 
 if [ ! -x "$ROOT/target/release/lux" ]; then
     echo "build the release binary first: cargo build --release --bin lux" >&2
@@ -41,8 +50,11 @@ trap cleanup EXIT INT TERM
 
 # --- image ---
 bash "$HERE/lib/fetch-image.sh"
-BASE_IMAGE="$HERE/fixtures/fedora.qcow2"
-export BASE_IMAGE
+case "$VM_TARGET" in
+    cloud) BASE_IMAGE="$HERE/fixtures/fedora.qcow2"; BASE_FMT=qcow2 ;;
+    bootc) BASE_IMAGE="$HERE/fixtures/fedora-bootc.raw"; BASE_FMT=raw ;;
+esac
+export BASE_IMAGE BASE_FMT
 
 # --- ssh key + cloud-init seed ---
 SSH_KEY="$WORKDIR/id_ed25519"
@@ -73,11 +85,17 @@ export VM_SSH
 # We use the locally-built binaries directly; install.sh is exercised on the
 # host side via `just lint` (shellcheck). Real release-install flow is
 # covered once release tags exist.
-SCP "$ROOT/target/release/lux" fedora@127.0.0.1:/home/fedora/lux
-SCP "$ROOT/target/release/luxd" fedora@127.0.0.1:/home/fedora/luxd
-SCP "$ROOT/systemd/luxd.service" fedora@127.0.0.1:/home/fedora/luxd.service
-$VM_SSH 'sudo install -m 755 /home/fedora/lux /usr/local/bin/lux'
-$VM_SSH 'sudo install -m 755 /home/fedora/luxd /usr/local/bin/luxd'
+if [ "$VM_TARGET" = "bootc" ]; then
+    # Baked into /usr/bin/ by tests/vm/bootc/Containerfile — /usr is
+    # read-only at runtime on bootc, so the only way in is via the image.
+    echo "bootc: lux + luxd pre-installed in image"
+else
+    SCP "$ROOT/target/release/lux" fedora@127.0.0.1:/home/fedora/lux
+    SCP "$ROOT/target/release/luxd" fedora@127.0.0.1:/home/fedora/luxd
+    SCP "$ROOT/systemd/luxd.service" fedora@127.0.0.1:/home/fedora/luxd.service
+    $VM_SSH 'sudo install -m 755 /home/fedora/lux /usr/local/bin/lux'
+    $VM_SSH 'sudo install -m 755 /home/fedora/luxd /usr/local/bin/luxd'
+fi
 
 # --- scenarios ---
 pass=0

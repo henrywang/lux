@@ -1,0 +1,23 @@
+# Fedora bootc 43 with cloud-init baked in so the existing
+# tests/vm/cloud-init/user-data.tmpl works unchanged. Keep everything the
+# scenarios expect (polkit, firewalld, flatpak) pre-installed — runtime
+# `dnf install` on bootc goes through a transient overlay and would be
+# wasted work for every boot.
+FROM quay.io/fedora/fedora-bootc:43
+
+RUN dnf install -y \
+        cloud-init \
+        polkit \
+        policycoreutils \
+        firewalld \
+        flatpak && \
+    systemctl enable cloud-init.target firewalld.service && \
+    dnf clean all
+
+# Bake lux + luxd into /usr — the bootc way of shipping software. The build
+# context is assembled by tests/vm/lib/fetch-image.sh from target/release/.
+COPY lux /usr/bin/lux
+COPY luxd /usr/bin/luxd
+COPY luxd.service /usr/lib/systemd/system/luxd.service
+RUN chmod 755 /usr/bin/lux /usr/bin/luxd && \
+    bootc container lint

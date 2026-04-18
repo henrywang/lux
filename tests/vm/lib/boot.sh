@@ -9,9 +9,10 @@ set -euo pipefail
 : "${SSH_PORT:=2222}"
 : "${SERIAL_LOG:=$WORKDIR/serial.log}"
 : "${VM_RAM_MB:=2048}"
+: "${BASE_FMT:=qcow2}"
 
 OVERLAY="$WORKDIR/overlay.qcow2"
-qemu-img create -q -f qcow2 -F qcow2 -b "$BASE_IMAGE" "$OVERLAY" >/dev/null
+qemu-img create -q -f qcow2 -F "$BASE_FMT" -b "$BASE_IMAGE" "$OVERLAY" >/dev/null
 
 KVM_ARGS=()
 if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then

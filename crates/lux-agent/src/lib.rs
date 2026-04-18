@@ -14,6 +14,23 @@ use tracing::{debug, info};
 /// Maximum tool call rounds before stopping (prevents infinite loops).
 const MAX_ROUNDS: usize = 10;
 
+/// Maximum bytes of tool output to feed back to the LLM.
+const TOOL_OUTPUT_MAX_BYTES: usize = 4000;
+
+/// Truncate tool output to at most `max` bytes, preserving UTF-8 char
+/// boundaries. Callers pass raw command output which may contain multi-byte
+/// glyphs (e.g. flatpak's `█` progress bar), so naive byte slicing panics.
+fn truncate_for_llm(output: String, max: usize) -> String {
+    if output.len() <= max {
+        return output;
+    }
+    let mut end = max;
+    while !output.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}...\n[output truncated]", &output[..end])
+}
+
 /// The lux agent.
 pub struct Agent<B: LlmBackend> {
     backend: B,
@@ -121,14 +138,7 @@ impl<B: LlmBackend> Agent<B> {
         info!("Executing tool: {} args={}", tc.name, tc.arguments);
 
         match self.tools.execute(&tc.name, &tc.arguments).await {
-            Ok(output) => {
-                // Truncate very long output
-                if output.len() > 4000 {
-                    format!("{}...\n[output truncated]", &output[..4000])
-                } else {
-                    output
-                }
-            }
+            Ok(output) => truncate_for_llm(output, TOOL_OUTPUT_MAX_BYTES),
             Err(e) => format!("Error: {e}"),
         }
     }
@@ -136,5 +146,28 @@ impl<B: LlmBackend> Agent<B> {
     /// Clear conversation history (keeps system prompt).
     pub fn clear_history(&mut self) {
         self.history.truncate(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn truncate_short_output_passes_through() {
+        let s = "hello".to_string();
+        assert_eq!(truncate_for_llm(s.clone(), 4000), s);
+    }
+
+    #[test]
+    fn truncate_at_multibyte_char_boundary_does_not_panic() {
+        // `█` is 3 bytes in UTF-8. Build a string where `max` lands mid-char.
+        let mut s = "a".repeat(9);
+        s.push('█');
+        s.push_str(&"b".repeat(20));
+        // len = 9 + 3 + 20 = 32. max=10 falls inside the `█` (bytes 9..12).
+        let out = truncate_for_llm(s, 10);
+        // Boundary walk-back keeps only the 9 leading 'a's, then appends marker.
+        assert_eq!(out, "aaaaaaaaa...\n[output truncated]");
     }
 }

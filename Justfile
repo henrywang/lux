@@ -30,6 +30,12 @@ vm-test:
     cargo build --release --bin lux --bin luxd
     bash tests/vm/run.sh
 
+# Same scenarios, but on a fedora-bootc:43 image (exercises bootc_* tools).
+# Requires: qemu, podman, bcvk. First run builds + converts the image.
+vm-test-bootc:
+    cargo build --release --bin lux --bin luxd
+    VM_TARGET=bootc bash tests/vm/run.sh
+
 install: build
     mkdir -p ~/.local/bin
     ln -sf $(pwd)/target/release/lux ~/.local/bin/lux
