@@ -1,5 +1,7 @@
 //! lux CLI — interactive AI agent for Linux desktop.
 
+mod portable;
+
 use anyhow::Result;
 use clap::Parser;
 use lux_agent::Agent;
@@ -8,6 +10,8 @@ use lux_tools::{SystemMode, ToolRegistry, sysinfo};
 use std::io::{self, BufRead, Write};
 use tracing_subscriber::EnvFilter;
 
+const DEFAULT_OLLAMA_URL: &str = "http://localhost:11434";
+
 #[derive(Parser)]
 #[command(name = "lux", about = "AI agent for Linux desktop")]
 struct Cli {
@@ -15,9 +19,10 @@ struct Cli {
     #[arg(long, default_value = "henrywang/lux")]
     model: String,
 
-    /// Ollama server URL
-    #[arg(long, default_value = "http://localhost:11434")]
-    ollama_url: String,
+    /// Ollama server URL (default: http://localhost:11434, unless a sibling
+    /// ollama binary is present → portable mode spawns one on an ephemeral port)
+    #[arg(long)]
+    ollama_url: Option<String>,
 
     /// Enable thinking mode (slower but more accurate)
     #[arg(long)]
@@ -175,10 +180,19 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    let ollama_url = cli.ollama_url.clone();
+    // Portable mode fires only when the user didn't pass --ollama-url. The
+    // returned guard must live for the whole process — dropping it kills
+    // the spawned ollama.
+    let _portable = portable::maybe_spawn(cli.ollama_url.is_some())?;
+    let ollama_url = cli
+        .ollama_url
+        .clone()
+        .or_else(|| _portable.as_ref().map(|p| p.url.clone()))
+        .unwrap_or_else(|| DEFAULT_OLLAMA_URL.to_string());
+
     let config = LlmConfig {
         model: cli.model.clone(),
-        base_url: cli.ollama_url,
+        base_url: ollama_url.clone(),
         thinking: cli.think,
     };
 
