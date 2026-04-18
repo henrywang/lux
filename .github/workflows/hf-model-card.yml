@@ -18,8 +18,8 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          pip install --quiet "huggingface_hub[cli]"
-          huggingface-cli upload \
+          pip install --quiet huggingface_hub
+          hf upload \
             henrywangxf/lux-portable \
             docs/hf-model-card.md \
             README.md \
