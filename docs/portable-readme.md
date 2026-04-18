@@ -12,11 +12,14 @@ flatpak installs, log reading, and service management work everywhere.
 ## Contents
 
 ```
-lux        # interactive CLI
-luxd       # background monitoring daemon (optional)
-ollama     # local inference server
-models/    # pre-pulled hf.co/henrywangxf/lux weights
-systemd/   # reference unit file for running luxd via systemd --user
+lux             # interactive CLI
+luxd            # background monitoring daemon (optional)
+llama-server    # local inference server (llama.cpp)
+libggml*.so     # shared libs loaded by llama-server ($ORIGIN rpath)
+libllama*.so
+libmtmd*.so
+models/         # pre-downloaded Q4_K_M GGUF weights (henrywangxf/lux)
+systemd/        # reference unit file for running luxd via systemd --user
 ```
 
 ## Run the CLI
@@ -25,18 +28,19 @@ systemd/   # reference unit file for running luxd via systemd --user
 ./lux
 ```
 
-On startup, lux notices the sibling `ollama` binary and `models/` directory and
-auto-spawns a local inference server on an ephemeral port. The server is
-terminated when lux exits. No files are written to `~/.ollama` or any system
-location.
+On startup, lux notices the sibling `llama-server` binary and `models/*.gguf`
+and auto-spawns a local inference server on an ephemeral port (with the
+model's chat template enabled via `--jinja`). The server is terminated when
+lux exits. No files are written outside this directory.
 
 ### Options
 
 - `./lux -c "install htop"` — one-shot command, no REPL.
-- `LUX_NO_PORTABLE=1 ./lux` — skip the sibling-ollama auto-spawn (useful when
+- `LUX_NO_PORTABLE=1 ./lux` — skip the sibling auto-spawn (useful when
   developing against a different server).
-- `./lux --ollama-url http://localhost:11434` — target an explicit server;
-  sibling-ollama auto-spawn is skipped.
+- `./lux --server-url http://localhost:11434` — target an explicit
+  OpenAI-compatible server (Ollama, llama-server, etc.); sibling auto-spawn
+  is skipped.
 
 ## Run the daemon (optional)
 
@@ -69,6 +73,7 @@ The unit is a user unit, not a system unit — it runs as you, not as root.
 ## Licensing
 
 - `lux` / `luxd`: Apache-2.0 (see the source repository for the full license).
-- `ollama`: MIT, bundled unmodified from https://ollama.com.
-- `models/`: the `hf.co/henrywangxf/lux` weights are redistributed under
-  Apache-2.0, inherited from the Qwen3 base model.
+- `llama-server` + `libggml*`/`libllama*`/`libmtmd*`: MIT, bundled unmodified
+  from https://github.com/ggml-org/llama.cpp.
+- `models/`: the `henrywangxf/lux` weights are redistributed under Apache-2.0,
+  inherited from the Qwen3 base model.

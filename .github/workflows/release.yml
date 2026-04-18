@@ -68,38 +68,35 @@ jobs:
       - name: Extract lux + luxd
         run: tar xzf build/lux-x86_64-unknown-linux-gnu.tar.gz -C build/
 
-      - name: Download ollama
+      - name: Download llama.cpp (llama-server)
+        env:
+          LLAMA_CPP_TAG: b8838
         run: |
-          curl -fsSL https://ollama.com/download/ollama-linux-amd64.tgz -o ollama.tgz
-          mkdir ollama-unpack
-          tar xzf ollama.tgz -C ollama-unpack
+          curl -fsSL \
+            "https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_CPP_TAG}/llama-${LLAMA_CPP_TAG}-bin-ubuntu-x64.tar.gz" \
+            -o llama-cpp.tgz
+          mkdir llama-cpp-unpack
+          tar xzf llama-cpp.tgz -C llama-cpp-unpack
 
-      - name: Pre-pull hf.co/henrywangxf/lux
+      - name: Download GGUF weights
         run: |
           mkdir -p bundle/models
-          OLLAMA_BIN="$(find ollama-unpack -name ollama -type f | head -n1)"
-          OLLAMA_HOST=127.0.0.1:11500 OLLAMA_MODELS="$PWD/bundle/models" "$OLLAMA_BIN" serve &
-          for _ in $(seq 1 30); do
-            curl -sf http://127.0.0.1:11500/api/tags >/dev/null && break
-            sleep 1
-          done
-          OLLAMA_HOST=127.0.0.1:11500 "$OLLAMA_BIN" pull hf.co/henrywangxf/lux
-          kill %1 || true
-          wait %1 2>/dev/null || true
+          curl -fsSL \
+            "https://huggingface.co/henrywangxf/lux/resolve/main/qwen3-1.7b.Q4_K_M.gguf" \
+            -o bundle/models/lux.gguf
+          ls -lh bundle/models/lux.gguf
 
       - name: Assemble tarball
         run: |
           mkdir -p bundle/systemd
           cp build/lux build/luxd bundle/
-          # Ollama ships as bin/ollama + lib/ollama/*.so; preserve that layout.
-          if [ -d ollama-unpack/bin ]; then
-            cp -r ollama-unpack/bin ollama-unpack/lib bundle/ 2>/dev/null || true
-            # Surface the launcher at the top of the bundle so the Rust side
-            # can find `./ollama` next to `./lux`.
-            ln -s bin/ollama bundle/ollama
-          else
-            cp ollama-unpack/ollama bundle/ollama
-          fi
+          # llama.cpp's Ubuntu release ships as build/bin/{llama-server,*.so}.
+          # Flatten into bundle/ so the portable-mode probe finds llama-server
+          # next to lux, and its rpath ($ORIGIN) finds the sibling .so files.
+          LLAMA_BIN_DIR="$(dirname "$(find llama-cpp-unpack -name llama-server -type f | head -n1)")"
+          cp "$LLAMA_BIN_DIR/llama-server" bundle/
+          cp "$LLAMA_BIN_DIR"/*.so* bundle/
+          chmod +x bundle/llama-server
           cp systemd/luxd.service bundle/systemd/
           cp docs/portable-readme.md bundle/README.md
           mv bundle lux-portable-linux-x86_64
@@ -136,9 +133,9 @@ jobs:
           files: artifacts/**/*
           generate_release_notes: true
           body: |
-            ## Portable bundle (standalone, ~4 GB)
+            ## Portable bundle (standalone, ~1 GB)
 
-            Lux + luxd + ollama + pre-pulled `hf.co/henrywangxf/lux` weights — extract and run, no system install or network required.
+            Lux + luxd + llama-server + pre-downloaded `henrywangxf/lux` weights (Q4_K_M GGUF) — extract and run, no system install or network required.
 
             **Download:** https://huggingface.co/henrywangxf/lux-portable/resolve/main/lux-portable-linux-x86_64-${{ github.ref_name }}.tar.gz
 
@@ -150,4 +147,4 @@ jobs:
 
             ## Raw binaries
 
-            Attached below. Requires an existing ollama server; see the repo README for install steps.
+            Attached below. Requires an existing OpenAI-compatible LLM server (Ollama or llama-server); see the repo README for install steps.
