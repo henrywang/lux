@@ -68,6 +68,39 @@ Both paths route to the same set of system tools that actually execute operation
 | `bootc_status` | Show current image status |
 | `run_command` | Run arbitrary shell commands (fallback) |
 
+## Background monitoring (luxd)
+
+`luxd` is an optional companion daemon that watches your system and
+surfaces problems to the REPL. It runs a handful of pure-Rust detectors
+on a timer:
+
+- Failed systemd units
+- Recent SELinux AVC denials
+- Disk-usage thresholds
+
+Findings are written as JSONL to `/run/user/<uid>/lux/findings.jsonl`
+and optionally pushed as desktop notifications. The REPL's `/findings`
+command reads that file, so opening `lux` shows you whatever went wrong
+while you were away. No LLM, no network, no privileged actions — it
+only observes and reports; fixes still go through `lux`.
+
+Foreground:
+
+```bash
+./target/release/luxd
+```
+
+Autostart at login via systemd (user unit, runs as you):
+
+```bash
+install -m 644 systemd/luxd.service ~/.config/systemd/user/luxd.service
+systemctl --user daemon-reload
+systemctl --user enable --now luxd.service
+```
+
+First run writes `~/.config/lux/luxd.toml`; edit to tune `mode`,
+`interval_secs`, and which detectors are active.
+
 ## Requirements
 
 - Fedora 41+ (or any Linux with systemd, dnf, flatpak)
@@ -129,7 +162,7 @@ crates/
   lux-llm/       LLM backend (ollama HTTP client)
   lux-tools/     System tool implementations
   lux-knowledge/ Knowledge base (planned)
-  luxd/          Daemon mode (planned)
+  luxd/          Background monitor (failed units, AVC, disk)
 bench/           Benchmark harness + scenarios
 finetune/        LoRA fine-tuning scripts + dataset
 ```

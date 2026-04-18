@@ -75,7 +75,7 @@ Most common queries hit lux's **rule-based fast path** and never reach the model
 ## License
 
 - Model weights: Apache 2.0 (inherited from Qwen3).
-- `lux` / `luxd`: MIT.
+- `lux` / `luxd`: Apache-2.0.
 - `ollama`: MIT (bundled unmodified from [ollama.com](https://ollama.com)).
 
 ## Links

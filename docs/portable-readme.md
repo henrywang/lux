@@ -62,7 +62,7 @@ The unit is a user unit, not a system unit — it runs as you, not as root.
 
 ## Licensing
 
-- `lux` / `luxd`: MIT (see the source repository for the full license).
+- `lux` / `luxd`: Apache-2.0 (see the source repository for the full license).
 - `ollama`: MIT, bundled unmodified from https://ollama.com.
-- `models/`: the `henrywang/lux` weights are redistributed under the terms of
-  the base model's license.
+- `models/`: the `henrywang/lux` weights are redistributed under Apache-2.0,
+  inherited from the Qwen3 base model.
