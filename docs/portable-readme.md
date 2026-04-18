@@ -15,7 +15,7 @@ flatpak installs, log reading, and service management work everywhere.
 lux        # interactive CLI
 luxd       # background monitoring daemon (optional)
 ollama     # local inference server
-models/    # pre-pulled henrywang/lux weights
+models/    # pre-pulled hf.co/henrywangxf/lux weights
 systemd/   # reference unit file for running luxd via systemd --user
 ```
 
@@ -70,5 +70,5 @@ The unit is a user unit, not a system unit — it runs as you, not as root.
 
 - `lux` / `luxd`: Apache-2.0 (see the source repository for the full license).
 - `ollama`: MIT, bundled unmodified from https://ollama.com.
-- `models/`: the `henrywang/lux` weights are redistributed under Apache-2.0,
-  inherited from the Qwen3 base model.
+- `models/`: the `hf.co/henrywangxf/lux` weights are redistributed under
+  Apache-2.0, inherited from the Qwen3 base model.

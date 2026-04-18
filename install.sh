@@ -45,8 +45,8 @@ if ! command -v ollama &>/dev/null; then
 fi
 
 # Pull model
-echo "Pulling henrywang/lux model..."
-ollama pull henrywang/lux
+echo "Pulling hf.co/henrywangxf/lux model..."
+ollama pull hf.co/henrywangxf/lux
 
 echo ""
 echo "=== Install complete ==="

@@ -10,7 +10,7 @@
                                     │ VPN:     IPsec                             │
   light for your Linux desktop      │ Uptime:  11h 50m                           │
   lux v0.1.0                        │ Mode:    package                           │
-  Model:   henrywang/lux            │ Issues:  none                              │
+  Model:   hf.co/henrywangxf/lux    │ Issues:  none                              │
   Ollama:  http://localhost:11434   ╰────────────────────────────────────────────╯
 ```
 
