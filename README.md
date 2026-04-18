@@ -103,7 +103,10 @@ First run writes `~/.config/lux/luxd.toml`; edit to tune `mode`,
 
 ## Requirements
 
-- Fedora 41+ (or any Linux with systemd, dnf, flatpak)
+- **Fedora 41+ / RHEL 9+ / CentOS Stream 9+** — lux is built around the
+  Fedora family (dnf, firewalld, bootc). Ubuntu/Debian/Arch can run the
+  binary, but tools that wrap dnf or firewall-cmd will report the distro
+  as unsupported until cross-distro backends land.
 - Rust 1.85+
 - [ollama](https://ollama.com/) (for the LLM fallback path)
 

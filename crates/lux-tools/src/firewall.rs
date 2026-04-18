@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use lux_llm::ToolDef;
 use serde_json::Value;
 
-use crate::{Tool, run_cmd_sudo};
+use crate::{Tool, require_binary, run_cmd_sudo};
 
 pub struct ManageFirewall;
 
@@ -45,6 +45,7 @@ impl Tool for ManageFirewall {
     }
 
     async fn execute(&self, args: &Value) -> Result<String> {
+        require_binary("firewall-cmd")?;
         let action = args
             .get("action")
             .and_then(|v| v.as_str())

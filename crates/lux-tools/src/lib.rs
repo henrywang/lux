@@ -142,3 +142,23 @@ pub(crate) async fn run_cmd_sudo(cmd: &str, args: &[&str]) -> Result<String> {
     full_args.extend_from_slice(args);
     run_cmd("pkexec", &full_args).await
 }
+
+/// Tools that wrap Fedora-specific binaries (dnf, firewall-cmd, bootc) call
+/// this before exec so users on Ubuntu/Debian/Arch get a clear message
+/// instead of an opaque ENOENT from the child process.
+pub(crate) fn require_binary(cmd: &str) -> Result<()> {
+    if binary_on_path(cmd) {
+        return Ok(());
+    }
+    anyhow::bail!(
+        "`{cmd}` is not installed. This tool targets the Fedora family \
+         (Fedora/RHEL/CentOS); other distros aren't supported yet."
+    )
+}
+
+fn binary_on_path(cmd: &str) -> bool {
+    let Some(path) = std::env::var_os("PATH") else {
+        return false;
+    };
+    std::env::split_paths(&path).any(|dir| dir.join(cmd).is_file())
+}

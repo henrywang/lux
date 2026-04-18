@@ -3,6 +3,12 @@
 This tarball contains everything needed to run lux on Linux x86_64, with no
 system-wide install and no network access after extraction.
 
+**Distro support:** lux is built for the Fedora family (Fedora, RHEL, CentOS
+Stream, and bootc images). The binary runs on any glibc Linux, but tools that
+wrap `dnf`, `firewall-cmd`, or `bootc` will report the distro as unsupported
+on Ubuntu/Debian/Arch until cross-distro backends land. The REPL, `/findings`,
+flatpak installs, log reading, and service management work everywhere.
+
 ## Contents
 
 ```

@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use lux_llm::ToolDef;
 use serde_json::Value;
 
-use crate::{Tool, run_cmd_sudo};
+use crate::{Tool, require_binary, run_cmd_sudo};
 
 pub struct InstallPackage;
 pub struct RemovePackage;
@@ -33,6 +33,7 @@ impl Tool for InstallPackage {
     }
 
     async fn execute(&self, args: &Value) -> Result<String> {
+        require_binary("dnf")?;
         let packages: Vec<String> = serde_json::from_value(
             args.get("packages")
                 .ok_or_else(|| anyhow::anyhow!("missing 'packages' argument"))?
@@ -102,6 +103,7 @@ impl Tool for RemovePackage {
     }
 
     async fn execute(&self, args: &Value) -> Result<String> {
+        require_binary("dnf")?;
         let packages: Vec<String> = serde_json::from_value(
             args.get("packages")
                 .ok_or_else(|| anyhow::anyhow!("missing 'packages' argument"))?

@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use lux_llm::ToolDef;
 use serde_json::Value;
 
-use crate::{Tool, run_cmd_sudo};
+use crate::{Tool, require_binary, run_cmd_sudo};
 
 pub struct UpdateSystem;
 
@@ -30,6 +30,7 @@ impl Tool for UpdateSystem {
     }
 
     async fn execute(&self, args: &Value) -> Result<String> {
+        require_binary("dnf")?;
         let check_only = args
             .get("check_only")
             .and_then(|v| v.as_bool())
