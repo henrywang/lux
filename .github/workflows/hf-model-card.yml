@@ -1,27 +1,37 @@
-name: Sync HF model card
+name: Sync HF model cards
 
 on:
   push:
     branches: [main]
     paths:
-      - docs/hf-model-card.md
+      - docs/hf-model-card-portable.md
+      - docs/hf-model-card-lux.md
       - .github/workflows/hf-model-card.yml
   workflow_dispatch:
 
 jobs:
   upload:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - source: docs/hf-model-card-portable.md
+            repo: henrywangxf/lux-portable
+          - source: docs/hf-model-card-lux.md
+            repo: henrywangxf/lux
     steps:
       - uses: actions/checkout@v6
 
-      - name: Upload to Hugging Face Hub
+      - name: Install hf CLI
+        run: pip install --quiet huggingface_hub
+
+      - name: Upload ${{ matrix.source }} to ${{ matrix.repo }}
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          pip install --quiet huggingface_hub
           hf upload \
-            henrywangxf/lux-portable \
-            docs/hf-model-card.md \
+            ${{ matrix.repo }} \
+            ${{ matrix.source }} \
             README.md \
             --repo-type model \
             --token "$HF_TOKEN" \
