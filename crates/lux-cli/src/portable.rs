@@ -1,24 +1,29 @@
-//! Portable-mode auto-spawn of a sibling `ollama` binary.
+//! Portable-mode auto-spawn of a sibling `llama-server` binary.
 //!
-//! When `lux` is extracted from the portable tarball and a sibling `ollama`
-//! executable and `models/` directory exist next to it, start ollama on an
-//! ephemeral localhost port so the agent works with no system-wide install.
-//! The child is linked to our process via `PR_SET_PDEATHSIG`, so it dies
-//! with us even on SIGKILL or panic.
+//! When `lux` is extracted from the portable tarball and a sibling
+//! `llama-server` executable and a `.gguf` model file exist next to it,
+//! start llama-server on an ephemeral localhost port so the agent works
+//! with no system-wide install. The child is linked to our process via
+//! `PR_SET_PDEATHSIG`, so it dies with us even on SIGKILL or panic.
+//!
+//! The model file is searched in `bin_dir/models/*.gguf` first, then
+//! `bin_dir/*.gguf`. The `--jinja` flag enables the model's chat template
+//! and structured tool-call output on `/v1/chat/completions`.
 
 use anyhow::{Context, Result, anyhow};
+use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
-pub struct PortableOllama {
+pub struct PortableServer {
     child: Child,
     pub url: String,
 }
 
-impl Drop for PortableOllama {
+impl Drop for PortableServer {
     fn drop(&mut self) {
         unsafe {
             libc::kill(self.child.id() as libc::pid_t, libc::SIGTERM);
@@ -27,10 +32,10 @@ impl Drop for PortableOllama {
     }
 }
 
-/// Spawn the sibling ollama if portable mode applies; otherwise return None.
-/// `user_specified_url` short-circuits portable mode when the caller passed
-/// `--ollama-url` explicitly.
-pub fn maybe_spawn(user_specified_url: bool) -> Result<Option<PortableOllama>> {
+/// Spawn the sibling llama-server if portable mode applies; otherwise return
+/// None. `user_specified_url` short-circuits portable mode when the caller
+/// passed `--ollama-url` explicitly.
+pub fn maybe_spawn(user_specified_url: bool) -> Result<Option<PortableServer>> {
     if user_specified_url {
         return Ok(None);
     }
@@ -40,27 +45,35 @@ pub fn maybe_spawn(user_specified_url: bool) -> Result<Option<PortableOllama>> {
     let Some(bin_dir) = sibling_dir() else {
         return Ok(None);
     };
-    if !detect(&bin_dir) {
+    let Some(gguf) = detect(&bin_dir) else {
         return Ok(None);
-    }
-    spawn_at(&bin_dir).map(Some)
+    };
+    spawn_at(&bin_dir, &gguf).map(Some)
 }
 
-/// Spawn ollama from `bin_dir` on an ephemeral port and wait for it to accept
-/// connections. Caller must hold the returned guard for as long as the server
-/// should stay alive — dropping it sends SIGTERM.
-fn spawn_at(bin_dir: &Path) -> Result<PortableOllama> {
-    let ollama = bin_dir.join("ollama");
-    let models = bin_dir.join("models");
+/// Spawn llama-server from `bin_dir` on an ephemeral port and wait for
+/// `/health` to go green. Caller must hold the returned guard for as long
+/// as the server should stay alive — dropping it sends SIGTERM.
+fn spawn_at(bin_dir: &Path, gguf: &Path) -> Result<PortableServer> {
+    let llama_server = bin_dir.join("llama-server");
 
     let port = pick_port()?;
     let host = format!("127.0.0.1:{port}");
-    tracing::info!("portable mode: spawning sibling ollama at {host}");
+    tracing::info!(
+        "portable mode: spawning llama-server at {host} with model {}",
+        gguf.display()
+    );
 
-    let mut cmd = Command::new(&ollama);
-    cmd.arg("serve")
-        .env("OLLAMA_HOST", &host)
-        .env("OLLAMA_MODELS", &models)
+    let mut cmd = Command::new(&llama_server);
+    cmd.arg("--host")
+        .arg("127.0.0.1")
+        .arg("--port")
+        .arg(port.to_string())
+        .arg("--model")
+        .arg(gguf)
+        .arg("--jinja")
+        .arg("--ctx-size")
+        .arg("4096")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
@@ -72,18 +85,33 @@ fn spawn_at(bin_dir: &Path) -> Result<PortableOllama> {
             Ok(())
         });
     }
-    let child = cmd.spawn().context("spawn sibling ollama")?;
-    let guard = PortableOllama {
+    let child = cmd.spawn().context("spawn sibling llama-server")?;
+    let guard = PortableServer {
         child,
         url: format!("http://{host}"),
     };
-    wait_ready(&host).context("sibling ollama failed to start")?;
+    wait_ready(&host).context("sibling llama-server failed to start")?;
     Ok(guard)
 }
 
-/// True when `bin_dir` contains a sibling ollama binary + models directory.
-pub fn detect(bin_dir: &Path) -> bool {
-    bin_dir.join("ollama").is_file() && bin_dir.join("models").is_dir()
+/// Return the .gguf path if `bin_dir` contains a llama-server binary and
+/// at least one .gguf file (in `models/` or the dir itself).
+pub fn detect(bin_dir: &Path) -> Option<PathBuf> {
+    if !bin_dir.join("llama-server").is_file() {
+        return None;
+    }
+    find_gguf(&bin_dir.join("models")).or_else(|| find_gguf(bin_dir))
+}
+
+fn find_gguf(dir: &Path) -> Option<PathBuf> {
+    let entries = std::fs::read_dir(dir).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().is_some_and(|e| e == "gguf") && path.is_file() {
+            return Some(path);
+        }
+    }
+    None
 }
 
 fn sibling_dir() -> Option<PathBuf> {
@@ -95,16 +123,40 @@ fn pick_port() -> Result<u16> {
     Ok(listener.local_addr()?.port())
 }
 
+/// Poll `/health` until it returns HTTP 200 (model loaded and ready) or we
+/// time out. llama-server binds the port before loading the model, so a bare
+/// TCP connect is insufficient — the first /v1 call would race the load.
 fn wait_ready(host: &str) -> Result<()> {
     let addr: SocketAddr = host.parse()?;
-    let deadline = Instant::now() + Duration::from_secs(10);
+    let deadline = Instant::now() + Duration::from_secs(60);
     while Instant::now() < deadline {
-        if TcpStream::connect_timeout(&addr, Duration::from_millis(200)).is_ok() {
+        if http_health_ok(&addr) {
             return Ok(());
         }
-        std::thread::sleep(Duration::from_millis(100));
+        std::thread::sleep(Duration::from_millis(200));
     }
-    Err(anyhow!("timed out waiting for ollama on {host}"))
+    Err(anyhow!("timed out waiting for llama-server on {host}"))
+}
+
+fn http_health_ok(addr: &SocketAddr) -> bool {
+    let Ok(mut stream) = TcpStream::connect_timeout(addr, Duration::from_millis(500)) else {
+        return false;
+    };
+    let _ = stream.set_read_timeout(Some(Duration::from_millis(500)));
+    let req = format!(
+        "GET /health HTTP/1.1\r\nHost: {addr}\r\nConnection: close\r\n\r\n",
+        addr = addr
+    );
+    if stream.write_all(req.as_bytes()).is_err() {
+        return false;
+    }
+    let mut buf = [0u8; 64];
+    let Ok(n) = stream.read(&mut buf) else {
+        return false;
+    };
+    // Status line starts "HTTP/1.1 200". Any other status (503 while loading,
+    // 404 on an older server build) means keep waiting.
+    buf[..n].starts_with(b"HTTP/1.1 200") || buf[..n].starts_with(b"HTTP/1.0 200")
 }
 
 #[cfg(test)]
@@ -114,25 +166,40 @@ mod tests {
     use std::os::unix::fs::PermissionsExt;
 
     #[test]
-    fn detect_needs_both_ollama_and_models() {
+    fn detect_needs_llama_server_and_gguf() {
         let dir = tempfile::tempdir().unwrap();
         let base = dir.path();
-        assert!(!detect(base));
+        assert!(detect(base).is_none());
 
-        fs::write(base.join("ollama"), b"#!/bin/sh\n").unwrap();
-        assert!(!detect(base), "ollama alone is not enough");
+        fs::write(base.join("llama-server"), b"#!/bin/sh\n").unwrap();
+        assert!(detect(base).is_none(), "llama-server alone is not enough");
 
+        // gguf in a sibling models/ dir should be picked up.
         fs::create_dir(base.join("models")).unwrap();
-        assert!(detect(base), "ollama + models/ triggers portable");
+        let gguf = base.join("models").join("lux.gguf");
+        fs::write(&gguf, b"fake weights").unwrap();
+        assert_eq!(detect(base), Some(gguf.clone()));
 
-        fs::remove_file(base.join("ollama")).unwrap();
-        assert!(!detect(base), "models/ alone is not enough");
+        // gguf directly beside the binary also works when no models/ hit.
+        fs::remove_file(&gguf).unwrap();
+        let gguf2 = base.join("lux.gguf");
+        fs::write(&gguf2, b"fake weights").unwrap();
+        assert_eq!(detect(base), Some(gguf2));
+
+        fs::remove_file(base.join("llama-server")).unwrap();
+        assert!(detect(base).is_none(), "gguf alone is not enough");
     }
 
-    /// Fake ollama that reads the port from $OLLAMA_HOST and answers any GET
-    /// with `{}`. Enough for `wait_ready` to accept the TCP connection.
-    const FAKE_OLLAMA: &str = r#"#!/bin/sh
-port="${OLLAMA_HOST##*:}"
+    /// Fake llama-server: reads `--port` from argv, serves `GET /health` with
+    /// HTTP 200. Enough to satisfy `wait_ready`.
+    const FAKE_LLAMA_SERVER: &str = r#"#!/bin/sh
+port=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --port) port="$2"; shift 2 ;;
+        *) shift ;;
+    esac
+done
 exec python3 -c "
 import http.server
 class H(http.server.BaseHTTPRequestHandler):
@@ -148,12 +215,13 @@ http.server.HTTPServer(('127.0.0.1', $port), H).serve_forever()
         let dir = tempfile::tempdir().unwrap();
         let base = dir.path();
 
-        let ollama = base.join("ollama");
-        fs::write(&ollama, FAKE_OLLAMA).unwrap();
-        fs::set_permissions(&ollama, fs::Permissions::from_mode(0o755)).unwrap();
-        fs::create_dir(base.join("models")).unwrap();
+        let llama = base.join("llama-server");
+        fs::write(&llama, FAKE_LLAMA_SERVER).unwrap();
+        fs::set_permissions(&llama, fs::Permissions::from_mode(0o755)).unwrap();
+        let gguf = base.join("lux.gguf");
+        fs::write(&gguf, b"fake weights").unwrap();
 
-        let guard = spawn_at(base).expect("spawn_at should succeed");
+        let guard = spawn_at(base, &gguf).expect("spawn_at should succeed");
         let pid = guard.child.id() as libc::pid_t;
         assert!(guard.url.starts_with("http://127.0.0.1:"));
 

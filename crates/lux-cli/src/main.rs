@@ -5,12 +5,12 @@ mod portable;
 use anyhow::Result;
 use clap::Parser;
 use lux_agent::Agent;
-use lux_llm::{LlmConfig, OllamaBackend};
+use lux_llm::{LlmConfig, OpenAiBackend};
 use lux_tools::{SystemMode, ToolRegistry, sysinfo};
 use std::io::{self, BufRead, Write};
 use tracing_subscriber::EnvFilter;
 
-const DEFAULT_OLLAMA_URL: &str = "http://localhost:11434";
+const DEFAULT_SERVER_URL: &str = "http://localhost:11434";
 
 #[derive(Parser)]
 #[command(name = "lux", about = "AI agent for Linux desktop")]
@@ -19,14 +19,11 @@ struct Cli {
     #[arg(long, default_value = "hf.co/henrywangxf/lux")]
     model: String,
 
-    /// Ollama server URL (default: http://localhost:11434, unless a sibling
-    /// ollama binary is present → portable mode spawns one on an ephemeral port)
-    #[arg(long)]
-    ollama_url: Option<String>,
-
-    /// Enable thinking mode (slower but more accurate)
-    #[arg(long)]
-    think: bool,
+    /// LLM server URL (default: http://localhost:11434, unless a sibling
+    /// llama-server binary is present → portable mode spawns one on an
+    /// ephemeral port). Any server that speaks /v1/chat/completions works.
+    #[arg(long, alias = "ollama-url")]
+    server_url: Option<String>,
 
     /// Force system mode instead of auto-detecting
     #[arg(long, value_parser = ["image", "package"])]
@@ -91,7 +88,7 @@ const LOGO_LINES: &[&str] = &[
     "  ╚══════╝ ╚═════╝ ╚═╝  ╚═╝",
 ];
 
-fn print_banner(mode: SystemMode, model: &str, ollama_url: &str) {
+fn print_banner(mode: SystemMode, model: &str, server_url: &str) {
     let info = sysinfo::collect(mode);
     let findings = count_findings();
     let mode_str = match mode {
@@ -105,7 +102,7 @@ fn print_banner(mode: SystemMode, model: &str, ollama_url: &str) {
     left.push("  light for your Linux desktop".into());
     left.push(format!("  lux v{}", env!("CARGO_PKG_VERSION")));
     left.push(format!("  Model:   {}", shorten(model, 28)));
-    left.push(format!("  Ollama:  {}", shorten(ollama_url, 28)));
+    left.push(format!("  Server:  {}", shorten(server_url, 28)));
 
     // Right column: system info in a box
     let inner_w: usize = 44;
@@ -180,20 +177,19 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    // Portable mode fires only when the user didn't pass --ollama-url. The
+    // Portable mode fires only when the user didn't pass --server-url. The
     // returned guard must live for the whole process — dropping it kills
-    // the spawned ollama.
-    let _portable = portable::maybe_spawn(cli.ollama_url.is_some())?;
-    let ollama_url = cli
-        .ollama_url
+    // the spawned llama-server.
+    let _portable = portable::maybe_spawn(cli.server_url.is_some())?;
+    let server_url = cli
+        .server_url
         .clone()
         .or_else(|| _portable.as_ref().map(|p| p.url.clone()))
-        .unwrap_or_else(|| DEFAULT_OLLAMA_URL.to_string());
+        .unwrap_or_else(|| DEFAULT_SERVER_URL.to_string());
 
     let config = LlmConfig {
         model: cli.model.clone(),
-        base_url: ollama_url.clone(),
-        thinking: cli.think,
+        base_url: server_url.clone(),
     };
 
     let mode = match cli.mode.as_deref() {
@@ -202,11 +198,11 @@ async fn main() -> Result<()> {
         _ => SystemMode::detect(),
     };
 
-    let backend = OllamaBackend::new(config);
+    let backend = OpenAiBackend::new(config);
     let tools = ToolRegistry::new(mode);
     let mut agent = Agent::new(backend, tools, mode);
 
-    print_banner(mode, &cli.model, &ollama_url);
+    print_banner(mode, &cli.model, &server_url);
 
     // Single command mode
     if let Some(cmd) = cli.command {

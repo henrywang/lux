@@ -2,5 +2,18 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track the llama.cpp release tag pinned in the portable-bundle job (e.g. b8838).",
+      "fileMatch": ["^\\.github/workflows/release\\.yml$"],
+      "matchStrings": [
+        "LLAMA_CPP_TAG:\\s*(?<currentValue>b\\d+)"
+      ],
+      "depNameTemplate": "ggml-org/llama.cpp",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "regex:^b(?<major>\\d+)$"
+    }
   ]
 }
