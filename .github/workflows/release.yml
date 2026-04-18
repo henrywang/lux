@@ -72,7 +72,7 @@ jobs:
         env:
           LLAMA_CPP_TAG: b8838
         run: |
-          curl -fsSL \
+          curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
             "https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_CPP_TAG}/llama-${LLAMA_CPP_TAG}-bin-ubuntu-x64.tar.gz" \
             -o llama-cpp.tgz
           mkdir llama-cpp-unpack
@@ -81,7 +81,7 @@ jobs:
       - name: Download GGUF weights
         run: |
           mkdir -p bundle/models
-          curl -fsSL \
+          curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
             "https://huggingface.co/henrywangxf/lux/resolve/main/qwen3-1.7b.Q4_K_M.gguf" \
             -o bundle/models/lux.gguf
           ls -lh bundle/models/lux.gguf
