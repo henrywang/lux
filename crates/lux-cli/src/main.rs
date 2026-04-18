@@ -16,7 +16,7 @@ const DEFAULT_OLLAMA_URL: &str = "http://localhost:11434";
 #[command(name = "lux", about = "AI agent for Linux desktop")]
 struct Cli {
     /// Model to use
-    #[arg(long, default_value = "henrywang/lux")]
+    #[arg(long, default_value = "hf.co/henrywangxf/lux")]
     model: String,
 
     /// Ollama server URL (default: http://localhost:11434, unless a sibling

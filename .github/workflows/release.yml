@@ -74,7 +74,7 @@ jobs:
           mkdir ollama-unpack
           tar xzf ollama.tgz -C ollama-unpack
 
-      - name: Pre-pull henrywang/lux
+      - name: Pre-pull hf.co/henrywangxf/lux
         run: |
           mkdir -p bundle/models
           OLLAMA_BIN="$(find ollama-unpack -name ollama -type f | head -n1)"
@@ -83,7 +83,7 @@ jobs:
             curl -sf http://127.0.0.1:11500/api/tags >/dev/null && break
             sleep 1
           done
-          OLLAMA_HOST=127.0.0.1:11500 "$OLLAMA_BIN" pull henrywang/lux
+          OLLAMA_HOST=127.0.0.1:11500 "$OLLAMA_BIN" pull hf.co/henrywangxf/lux
           kill %1 || true
           wait %1 2>/dev/null || true
 
@@ -138,7 +138,7 @@ jobs:
           body: |
             ## Portable bundle (standalone, ~4 GB)
 
-            Lux + luxd + ollama + pre-pulled `henrywang/lux` weights — extract and run, no system install or network required.
+            Lux + luxd + ollama + pre-pulled `hf.co/henrywangxf/lux` weights — extract and run, no system install or network required.
 
             **Download:** https://huggingface.co/henrywangxf/lux-portable/resolve/main/lux-portable-linux-x86_64-${{ github.ref_name }}.tar.gz
 

@@ -61,7 +61,7 @@ pub struct LlmConfig {
 impl Default for LlmConfig {
     fn default() -> Self {
         Self {
-            model: "henrywang/lux".to_string(),
+            model: "hf.co/henrywangxf/lux".to_string(),
             base_url: "http://localhost:11434".to_string(),
             thinking: false,
         }
