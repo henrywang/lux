@@ -3,10 +3,11 @@
 mod portable;
 
 use anyhow::Result;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use lux_agent::Agent;
 use lux_llm::{LlmConfig, OpenAiBackend};
-use lux_tools::{SystemMode, ToolRegistry, sysinfo};
+use lux_tools::{ApplyRecipe, ListRecipes, SystemMode, Tool, ToolRegistry, sysinfo};
+use serde_json::{Value, json};
 use std::io::{self, BufRead, Write};
 use tracing_subscriber::EnvFilter;
 
@@ -32,6 +33,33 @@ struct Cli {
     /// Run a single command and exit (non-interactive)
     #[arg(short, long)]
     command: Option<String>,
+
+    #[command(subcommand)]
+    subcommand: Option<Command>,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    /// Manage recipes (opinionated multi-step setups). Bypasses the LLM —
+    /// useful for scripts, CI, and power users who know the recipe name.
+    Recipe {
+        #[command(subcommand)]
+        action: RecipeAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum RecipeAction {
+    /// List all available recipes
+    List,
+    /// Apply a recipe by name
+    Apply {
+        /// Recipe name (e.g. browser-chromium)
+        name: String,
+        /// Skip the confirmation prompt (required when stdin is not a TTY)
+        #[arg(short = 'y', long = "yes")]
+        yes: bool,
+    },
 }
 
 fn findings_path() -> std::path::PathBuf {
@@ -177,6 +205,13 @@ async fn main() -> Result<()> {
         )
         .init();
 
+    // Subcommands run before any LLM/agent setup — they don't need ollama,
+    // a downloaded model, or the portable llama-server. Recipe operations
+    // talk straight to the lux-tools layer.
+    if let Some(cmd) = cli.subcommand {
+        return run_subcommand(cmd).await;
+    }
+
     // Portable mode fires only when the user didn't pass --server-url. The
     // returned guard must live for the whole process — dropping it kills
     // the spawned llama-server.
@@ -256,4 +291,22 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+async fn run_subcommand(cmd: Command) -> Result<()> {
+    match cmd {
+        Command::Recipe { action } => match action {
+            RecipeAction::List => {
+                let out = ListRecipes.execute(&Value::Null).await?;
+                print!("{out}");
+                Ok(())
+            }
+            RecipeAction::Apply { name, yes } => {
+                let args = json!({"name": name, "assume_yes": yes});
+                let out = ApplyRecipe.execute(&args).await?;
+                print!("{out}");
+                Ok(())
+            }
+        },
+    }
 }
