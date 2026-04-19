@@ -63,14 +63,17 @@ jobs:
             distro: fedora
             image: fedora:latest
             expect: success
+            verify: command -v chromium-browser >/dev/null 2>&1 || command -v chromium >/dev/null 2>&1
           - recipe: browser-chromium
             distro: archlinux
             image: archlinux:latest
             expect: success
+            verify: command -v chromium >/dev/null 2>&1
           - recipe: browser-chromium
             distro: debian
             image: debian:stable
             expect: success
+            verify: command -v chromium >/dev/null 2>&1
           - recipe: browser-chromium
             distro: ubuntu
             image: ubuntu:latest
@@ -128,6 +131,17 @@ jobs:
               if [ "$STATUS" -ne 0 ]; then
                 echo "::error::Expected success on ${{ matrix.distro }}, got exit $STATUS"
                 exit 1
+              fi
+              # Post-install verify: catches silent-green recipes that
+              # exited 0 without actually installing the thing. Without
+              # this, a recipe whose distro branch fell through to a
+              # no-op would still report success.
+              VERIFY='${{ matrix.verify }}'
+              if [ -n "$VERIFY" ]; then
+                if ! bash -c "$VERIFY"; then
+                  echo "::error::Recipe exited 0 but verify failed on ${{ matrix.distro }}: $VERIFY"
+                  exit 1
+                fi
               fi
               ;;
             refuse-snap)
