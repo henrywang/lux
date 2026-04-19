@@ -195,7 +195,10 @@ async fn run_recipe(recipe: &Recipe, distro: Distro) -> Result<String> {
 async fn run_step(step: &Step) -> Result<()> {
     match step {
         Step::Shell { shell, .. } => {
-            let out = tokio::process::Command::new("sh")
+            // Explicitly use bash, not sh. On Debian/Ubuntu /bin/sh is dash,
+            // which doesn't support `set -o pipefail` — a feature every
+            // recipe relies on for safety. bash is universal on Linux.
+            let out = tokio::process::Command::new("bash")
                 .args(["-c", shell])
                 .output()
                 .await?;
