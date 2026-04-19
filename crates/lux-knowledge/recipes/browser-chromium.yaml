@@ -1,0 +1,42 @@
+name: browser-chromium
+summary: "Chromium browser (FOSS Chrome) from native distro repos"
+
+# `install chrome` routes here. lux installs Chromium, not Google Chrome
+# (closed-source, telemetry, EULA). Same swap pattern as vscode→vscodium.
+#
+# Distro dispatch:
+# - Fedora: `chromium` in main repos
+# - Arch:   `chromium` in extra
+# - Debian: `chromium` in main repos
+# - Ubuntu: the apt `chromium` package is a snap transitional shim. Refuse
+#           and recommend the Flathub build instead, since installing snapd
+#           on a non-snap-by-default user's box is a heavier change than
+#           this recipe should make.
+
+steps:
+  - shell: |
+      set -euo pipefail
+      if command -v dnf >/dev/null 2>&1; then
+        sudo dnf install -y chromium
+      elif command -v pacman >/dev/null 2>&1; then
+        sudo pacman -S --noconfirm --needed chromium
+      elif command -v apt-get >/dev/null 2>&1; then
+        distro_id=""
+        if [ -r /etc/os-release ]; then
+          distro_id=$(. /etc/os-release && echo "${ID:-} ${ID_LIKE:-}")
+        fi
+        case "$distro_id" in
+          *ubuntu*)
+            echo "On Ubuntu the apt 'chromium' package is a snap shim." >&2
+            echo "Install via flatpak instead:" >&2
+            echo "  flatpak install -y flathub org.chromium.Chromium" >&2
+            exit 1
+            ;;
+        esac
+        sudo apt-get update
+        sudo apt-get install -y chromium
+      else
+        echo "Unsupported distro for Chromium install" >&2
+        exit 1
+      fi
+    describe: Install Chromium (Fedora/Arch/Debian native; Ubuntu unsupported)

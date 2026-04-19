@@ -18,6 +18,10 @@ const BUNDLED: &[(&str, &str)] = &[
         include_str!("../recipes/editor-vscodium.yaml"),
     ),
     ("editor-zed", include_str!("../recipes/editor-zed.yaml")),
+    (
+        "browser-chromium",
+        include_str!("../recipes/browser-chromium.yaml"),
+    ),
 ];
 
 pub struct RecipeRegistry {

@@ -69,7 +69,7 @@ impl Tool for ApplyRecipe {
             description: "Apply a named recipe (multi-step opinionated setup). Shows the planned \
                  actions and asks for confirmation before executing. Known recipes: \
                  zsh-popular, ghostty-default, ai-dev-cpu, ai-dev-cuda, editor-vscodium, \
-                 editor-zed."
+                 editor-zed, browser-chromium."
                 .into(),
             parameters: serde_json::json!({
                 "type": "object",

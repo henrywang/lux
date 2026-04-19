@@ -155,7 +155,7 @@ fn try_recipe(s: &str) -> Option<ToolCall> {
     // Compound requests (multiple recipe targets mentioned) go to the LLM,
     // which can emit several apply_recipe calls. The intent matcher only
     // dispatches one tool call per turn.
-    let targets = ["zsh", "ghostty", "vscodium"];
+    let targets = ["zsh", "ghostty", "vscodium", "chrome", "chromium"];
     let mut mentioned = targets.iter().filter(|t| s.contains(*t)).count();
     if contains_word(s, "zed") {
         mentioned += 1;
@@ -217,6 +217,16 @@ fn try_recipe(s: &str) -> Option<ToolCall> {
     // editor-zed — word-boundary check to avoid "freeze"/"sized"/etc.
     if contains_word(s, "zed") && install_or_indicator {
         return Some(tool_call("apply_recipe", json!({"name": "editor-zed"})));
+    }
+
+    // "install chrome" routes to Chromium — lux doesn't install Google
+    // Chrome (closed-source, telemetry). Note: "chrome" is NOT a substring
+    // of "chromium" (they share "chrom"), so both must be checked.
+    if (s.contains("chrome") || s.contains("chromium")) && install_or_indicator {
+        return Some(tool_call(
+            "apply_recipe",
+            json!({"name": "browser-chromium"}),
+        ));
     }
 
     None
@@ -1099,6 +1109,17 @@ mod tests {
     fn install_ghostty_routes_to_recipe() {
         assert_tool_args("install ghostty", "apply_recipe", |args| {
             assert_eq!(args["name"], "ghostty-default");
+        });
+    }
+
+    #[test]
+    fn install_chrome_routes_to_chromium_recipe() {
+        // Google Chrome is not installed by lux — recipe swaps to Chromium.
+        assert_tool_args("install chrome", "apply_recipe", |args| {
+            assert_eq!(args["name"], "browser-chromium");
+        });
+        assert_tool_args("install chromium", "apply_recipe", |args| {
+            assert_eq!(args["name"], "browser-chromium");
         });
     }
 
