@@ -77,7 +77,50 @@ jobs:
           - recipe: browser-chromium
             distro: ubuntu
             image: ubuntu:latest
-            expect: refuse-snap
+            expect: refuse
+            refuse_match: "snap shim"
+
+          - recipe: editor-sublime
+            distro: fedora
+            image: fedora:latest
+            expect: success
+            verify: command -v subl >/dev/null 2>&1
+          - recipe: editor-sublime
+            distro: archlinux
+            image: archlinux:latest
+            expect: success
+            verify: command -v subl >/dev/null 2>&1
+          - recipe: editor-sublime
+            distro: debian
+            image: debian:stable
+            expect: success
+            verify: command -v subl >/dev/null 2>&1
+          - recipe: editor-sublime
+            distro: ubuntu
+            image: ubuntu:latest
+            expect: success
+            verify: command -v subl >/dev/null 2>&1
+
+          - recipe: zoom
+            distro: fedora
+            image: fedora:latest
+            expect: success
+            verify: command -v zoom >/dev/null 2>&1
+          - recipe: zoom
+            distro: debian
+            image: debian:stable
+            expect: success
+            verify: command -v zoom >/dev/null 2>&1
+          - recipe: zoom
+            distro: ubuntu
+            image: ubuntu:latest
+            expect: success
+            verify: command -v zoom >/dev/null 2>&1
+          - recipe: zoom
+            distro: archlinux
+            image: archlinux:latest
+            expect: refuse
+            refuse_match: "AUR"
     container:
       image: ${{ matrix.image }}
     steps:
@@ -144,15 +187,21 @@ jobs:
                 fi
               fi
               ;;
-            refuse-snap)
+            refuse)
               # Recipe should refuse cleanly (exit != 0) and mention the
-              # snap-shim reason so users know why and what to do instead.
+              # reason in its output, so users know why and what to do
+              # instead. The needle to grep for is per-cell (matrix.refuse_match).
               if [ "$STATUS" -eq 0 ]; then
                 echo "::error::Expected ${{ matrix.distro }} to refuse, but recipe succeeded"
                 exit 1
               fi
-              if ! printf '%s' "$OUTPUT" | grep -qi 'snap shim'; then
-                echo "::error::Expected snap-shim refusal message on ${{ matrix.distro }}"
+              NEEDLE='${{ matrix.refuse_match }}'
+              if [ -z "$NEEDLE" ]; then
+                echo "::error::expect=refuse but matrix.refuse_match is empty"
+                exit 1
+              fi
+              if ! printf '%s' "$OUTPUT" | grep -qi "$NEEDLE"; then
+                echo "::error::Expected refusal message to contain '$NEEDLE' on ${{ matrix.distro }}"
                 exit 1
               fi
               ;;

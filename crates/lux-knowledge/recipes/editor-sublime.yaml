@@ -1,0 +1,47 @@
+name: editor-sublime
+summary: "Sublime Text editor from Sublime HQ's official repositories"
+
+# Sublime Text is proprietary but free to evaluate. Each distro gets its
+# canonical install path per Sublime HQ's docs:
+#   https://www.sublimetext.com/docs/linux_repositories.html
+#
+# We add the vendor repo + import their signing key, then install. This
+# is non-trivial (multiple steps, GPG handling) — exactly what recipes
+# are for.
+
+steps:
+  - shell: |
+      set -euo pipefail
+      if command -v dnf >/dev/null 2>&1; then
+        sudo rpm --import https://download.sublimetext.com/sublimehq-rpm-pub.gpg
+        # Drop the .repo file directly — avoids depending on dnf5 vs dnf4
+        # `config-manager addrepo` CLI differences.
+        sudo curl -fsSL -o /etc/yum.repos.d/sublime-text.repo \
+          https://download.sublimetext.com/rpm/stable/x86_64/sublime-text.repo
+        sudo dnf install -y sublime-text
+      elif command -v pacman >/dev/null 2>&1; then
+        # pacman-key needs a file on disk, not stdin.
+        tmpkey=$(mktemp)
+        trap 'rm -f "$tmpkey"' EXIT
+        curl -fsSL -o "$tmpkey" https://download.sublimetext.com/sublimehq-pub.gpg
+        sudo pacman-key --add "$tmpkey"
+        sudo pacman-key --lsign-key 8A8F901A
+        if ! grep -q '^\[sublime-text\]' /etc/pacman.conf; then
+          printf '\n[sublime-text]\nServer = https://download.sublimetext.com/arch/stable/x86_64\n' \
+            | sudo tee -a /etc/pacman.conf >/dev/null
+        fi
+        sudo pacman -Syu --noconfirm sublime-text
+      elif command -v apt-get >/dev/null 2>&1; then
+        sudo apt-get install -y --no-install-recommends \
+          apt-transport-https ca-certificates curl gnupg
+        curl -fsSL https://download.sublimetext.com/sublimehq-pub.gpg | \
+          sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/sublimehq-pub.gpg
+        echo "deb https://download.sublimetext.com/ apt/stable/" | \
+          sudo tee /etc/apt/sources.list.d/sublime-text.list >/dev/null
+        sudo apt-get update
+        sudo apt-get install -y sublime-text
+      else
+        echo "Unsupported distro for Sublime Text install" >&2
+        exit 1
+      fi
+    describe: Install Sublime Text (Fedora/Arch/Debian/Ubuntu via vendor repos)

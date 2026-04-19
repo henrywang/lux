@@ -1,0 +1,40 @@
+name: zoom
+summary: "Zoom desktop client from zoom.us (proprietary)"
+
+# Zoom is proprietary and ships only as direct downloads from zoom.us —
+# no native repo. We grab the per-distro package and let the native
+# package manager resolve deps.
+#
+# Arch isn't covered: Zoom lives in the AUR only, which needs an AUR
+# helper (yay/paru) — installing one of those just to satisfy a recipe
+# is a heavier change than this recipe should make. We refuse and
+# point to the AUR / Flatpak paths.
+
+steps:
+  - shell: |
+      set -euo pipefail
+      tmpdir=$(mktemp -d)
+      trap 'rm -rf "$tmpdir"' EXIT
+      if command -v dnf >/dev/null 2>&1; then
+        sudo dnf install -y curl
+        curl -fsSL -o "$tmpdir/zoom.rpm" https://zoom.us/client/latest/zoom_x86_64.rpm
+        sudo dnf install -y "$tmpdir/zoom.rpm"
+      elif command -v apt-get >/dev/null 2>&1; then
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends curl ca-certificates
+        curl -fsSL -o "$tmpdir/zoom.deb" https://zoom.us/client/latest/zoom_amd64.deb
+        # apt-get install on a path (with ./ or /) installs the local
+        # .deb and resolves its dependencies from configured repos.
+        sudo apt-get install -y "$tmpdir/zoom.deb"
+      elif command -v pacman >/dev/null 2>&1; then
+        echo "On Arch Linux, Zoom lives in the AUR, not the official repos." >&2
+        echo "Install via an AUR helper:" >&2
+        echo "  yay -S zoom    (or paru -S zoom)" >&2
+        echo "Or use the Flatpak build:" >&2
+        echo "  flatpak install -y flathub us.zoom.Zoom" >&2
+        exit 1
+      else
+        echo "Unsupported distro for Zoom install" >&2
+        exit 1
+      fi
+    describe: Install Zoom (Fedora/Debian/Ubuntu via vendor download; Arch unsupported)

@@ -39,16 +39,12 @@ const GUI_APPS: &[(&str, &str, Option<&str>)] = &[
     ("steam", "com.valvesoftware.Steam", None),
     ("discord", "com.discordapp.Discord", None),
     ("slack", "com.slack.Slack", None),
-    ("zoom", "us.zoom.Zoom", None),
     ("spotify", "com.spotify.Client", None),
     ("signal", "org.signal.Signal", None),
-    // vscode / vscodium / zed are owned by recipes (editor-vscodium,
-    // editor-zed). Keep them out of this table so `install vscode` routes
-    // through try_recipe → the canonical (native) install, not a
-    // community-repackaged flatpak.
-    ("chrome", "com.google.Chrome", None),
-    ("sublime text", "com.sublimetext.three", None),
-    ("sublime", "com.sublimetext.three", None),
+    // vscode / vscodium / zed / chrome / chromium / sublime / zoom are
+    // owned by recipes — keep them out of this table so `install <name>`
+    // routes through try_recipe → the canonical (vendor-repo or native)
+    // install, not a community-repackaged flatpak.
     ("bitwarden", "com.bitwarden.desktop", None),
     ("obsidian", "md.obsidian.Obsidian", None),
     ("postman", "com.getpostman.Postman", None),
@@ -155,7 +151,9 @@ fn try_recipe(s: &str) -> Option<ToolCall> {
     // Compound requests (multiple recipe targets mentioned) go to the LLM,
     // which can emit several apply_recipe calls. The intent matcher only
     // dispatches one tool call per turn.
-    let targets = ["zsh", "ghostty", "vscodium", "chrome", "chromium"];
+    let targets = [
+        "zsh", "ghostty", "vscodium", "chrome", "chromium", "sublime", "zoom",
+    ];
     let mut mentioned = targets.iter().filter(|t| s.contains(*t)).count();
     if contains_word(s, "zed") {
         mentioned += 1;
@@ -227,6 +225,18 @@ fn try_recipe(s: &str) -> Option<ToolCall> {
             "apply_recipe",
             json!({"name": "browser-chromium"}),
         ));
+    }
+
+    // editor-sublime — vendor repo setup is non-trivial enough to warrant
+    // a recipe over a bare install_flatpak.
+    if s.contains("sublime") && install_or_indicator {
+        return Some(tool_call("apply_recipe", json!({"name": "editor-sublime"})));
+    }
+
+    // zoom — proprietary vendor download per distro; recipe handles
+    // the fetch + native install (and refuses cleanly on Arch).
+    if s.contains("zoom") && install_or_indicator {
+        return Some(tool_call("apply_recipe", json!({"name": "zoom"})));
     }
 
     None
@@ -1120,6 +1130,23 @@ mod tests {
         });
         assert_tool_args("install chromium", "apply_recipe", |args| {
             assert_eq!(args["name"], "browser-chromium");
+        });
+    }
+
+    #[test]
+    fn install_sublime_routes_to_recipe() {
+        assert_tool_args("install sublime", "apply_recipe", |args| {
+            assert_eq!(args["name"], "editor-sublime");
+        });
+        assert_tool_args("install sublime text", "apply_recipe", |args| {
+            assert_eq!(args["name"], "editor-sublime");
+        });
+    }
+
+    #[test]
+    fn install_zoom_routes_to_recipe() {
+        assert_tool_args("install zoom", "apply_recipe", |args| {
+            assert_eq!(args["name"], "zoom");
         });
     }
 

@@ -22,6 +22,11 @@ const BUNDLED: &[(&str, &str)] = &[
         "browser-chromium",
         include_str!("../recipes/browser-chromium.yaml"),
     ),
+    (
+        "editor-sublime",
+        include_str!("../recipes/editor-sublime.yaml"),
+    ),
+    ("zoom", include_str!("../recipes/zoom.yaml")),
 ];
 
 pub struct RecipeRegistry {
