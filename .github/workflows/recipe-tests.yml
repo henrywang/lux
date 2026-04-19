@@ -1,0 +1,149 @@
+name: Recipe tests
+
+# Runs each lux recipe end-to-end inside a fresh container per supported
+# distro. Catches both "PR broke a recipe" and "upstream package /
+# repo / install path drifted" — the latter via the nightly cron.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/lux-knowledge/recipes/**'
+      - 'crates/lux-knowledge/src/**'
+      - 'crates/lux-tools/src/recipes.rs'
+      - 'crates/lux-cli/src/main.rs'
+      - '.github/workflows/recipe-tests.yml'
+  schedule:
+    - cron: '0 6 * * *'  # 06:00 UTC daily — catches upstream drift
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build lux binary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build release binary
+        run: cargo build --release --bin lux
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: lux-binary
+          path: target/release/lux
+          retention-days: 1
+          if-no-files-found: error
+
+  recipe-test:
+    name: ${{ matrix.recipe }} on ${{ matrix.distro }}
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false  # collect every cell — the matrix table is the diagnostic
+      matrix:
+        include:
+          - recipe: browser-chromium
+            distro: fedora
+            image: fedora:latest
+            expect: success
+          - recipe: browser-chromium
+            distro: archlinux
+            image: archlinux:latest
+            expect: success
+          - recipe: browser-chromium
+            distro: debian
+            image: debian:stable
+            expect: success
+          - recipe: browser-chromium
+            distro: ubuntu
+            image: ubuntu:latest
+            expect: refuse-snap
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - name: Install minimal container deps
+        shell: bash
+        run: |
+          set -eux
+          if command -v dnf >/dev/null 2>&1; then
+            dnf install -y --setopt=install_weak_deps=False ca-certificates
+          elif command -v pacman >/dev/null 2>&1; then
+            # Refresh package DB; archlinux:latest is rolling.
+            pacman -Sy --noconfirm ca-certificates
+          elif command -v apt-get >/dev/null 2>&1; then
+            apt-get update
+            apt-get install -y --no-install-recommends ca-certificates
+          fi
+
+      - name: Shim sudo (containers run as root by default)
+        shell: bash
+        run: |
+          # The recipe shells use `sudo`; in the container we're already
+          # root, so make `sudo` a transparent passthrough rather than
+          # installing the real package per distro.
+          printf '#!/bin/sh\nexec "$@"\n' > /usr/local/bin/sudo
+          chmod +x /usr/local/bin/sudo
+
+      - name: Download lux binary
+        uses: actions/download-artifact@v4
+        with:
+          name: lux-binary
+          path: .
+
+      - name: Make lux executable
+        shell: bash
+        run: chmod +x ./lux
+
+      - name: Apply recipe ${{ matrix.recipe }} (expect ${{ matrix.expect }})
+        shell: bash
+        run: |
+          set +e
+          OUTPUT=$(./lux recipe apply ${{ matrix.recipe }} --yes 2>&1)
+          STATUS=$?
+          set -e
+
+          echo "::group::lux output (exit=$STATUS)"
+          echo "$OUTPUT"
+          echo "::endgroup::"
+
+          case "${{ matrix.expect }}" in
+            success)
+              if [ "$STATUS" -ne 0 ]; then
+                echo "::error::Expected success on ${{ matrix.distro }}, got exit $STATUS"
+                exit 1
+              fi
+              ;;
+            refuse-snap)
+              # Recipe should refuse cleanly (exit != 0) and mention the
+              # snap-shim reason so users know why and what to do instead.
+              if [ "$STATUS" -eq 0 ]; then
+                echo "::error::Expected ${{ matrix.distro }} to refuse, but recipe succeeded"
+                exit 1
+              fi
+              if ! printf '%s' "$OUTPUT" | grep -qi 'snap shim'; then
+                echo "::error::Expected snap-shim refusal message on ${{ matrix.distro }}"
+                exit 1
+              fi
+              ;;
+            *)
+              echo "::error::Unknown expect value: ${{ matrix.expect }}"
+              exit 1
+              ;;
+          esac
