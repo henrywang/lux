@@ -1,22 +1,12 @@
-//! Local knowledge base for the lux agent.
+//! Recipe registry for the lux agent.
 //!
-//! Provides RAG-style retrieval over local documentation:
-//! man pages, package metadata, common fixes, hardware compatibility.
-//!
-//! TODO: Implement vector search with SQLite + embeddings.
+//! A recipe is an opinionated, multi-step setup (e.g. "zsh-popular",
+//! "ai-dev-cpu") described declaratively in YAML. The registry loads bundled
+//! recipes at compile time; `lux-tools::apply_recipe` expands a recipe into
+//! concrete side effects (package install, shell exec, file write).
 
-/// Placeholder for knowledge base.
-/// Will be implemented with local vector search.
-pub struct KnowledgeBase;
+mod recipe;
+mod registry;
 
-impl KnowledgeBase {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for KnowledgeBase {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+pub use recipe::{Distro, PackageSpec, Recipe, Step, WriteFile};
+pub use registry::RecipeRegistry;

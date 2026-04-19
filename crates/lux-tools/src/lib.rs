@@ -10,6 +10,7 @@ mod flatpak;
 mod logs;
 mod network;
 mod package;
+mod recipes;
 mod service;
 mod shell;
 pub mod sysinfo;
@@ -27,6 +28,7 @@ pub use flatpak::*;
 pub use logs::*;
 pub use network::*;
 pub use package::*;
+pub use recipes::*;
 pub use service::*;
 pub use shell::*;
 pub use update::*;
@@ -64,6 +66,8 @@ impl ToolRegistry {
             Box::new(firewall::ManageFirewall),
             Box::new(network::NetworkDiagnose),
             Box::new(shell::RunCommand),
+            Box::new(recipes::ListRecipes),
+            Box::new(recipes::ApplyRecipe),
         ];
 
         if mode == SystemMode::Image {

@@ -1,0 +1,38 @@
+name: ghostty-default
+summary: "Ghostty terminal (native per-distro install) + Catppuccin Mocha theme"
+
+# Distro-dispatched install: no single upstream package fits all.
+# - Fedora: COPR `pgdev/ghostty` (actively maintained, matches upstream releases)
+# - Arch:   official `ghostty` in extra
+# - Debian/Ubuntu: no official package yet — recipe refuses cleanly.
+
+steps:
+  - shell: |
+      set -euo pipefail
+      if command -v dnf >/dev/null 2>&1; then
+        sudo dnf install -y dnf-plugins-core
+        sudo dnf copr enable -y pgdev/ghostty
+        sudo dnf install -y ghostty
+      elif command -v pacman >/dev/null 2>&1; then
+        sudo pacman -S --noconfirm --needed ghostty
+      elif command -v apt-get >/dev/null 2>&1; then
+        echo "Ghostty does not yet have an official Debian/Ubuntu package." >&2
+        echo "See https://ghostty.org for options (flatpak, build from source)." >&2
+        exit 1
+      else
+        echo "Unsupported distro for Ghostty install" >&2
+        exit 1
+      fi
+    describe: Install Ghostty (Fedora COPR / Arch official / Debian unsupported)
+
+  - write_file:
+      path: ~/.config/ghostty/config
+      content: |
+        # Managed by lux: ghostty-default recipe
+        theme = catppuccin-mocha
+        font-family = JetBrains Mono
+        font-size = 12
+        cursor-style = bar
+        window-padding-x = 8
+        window-padding-y = 8
+    describe: Write ~/.config/ghostty/config

@@ -1,0 +1,67 @@
+name: ai-dev-cuda
+summary: "AI dev environment (CUDA): uv + Jupyter + HuggingFace + Ollama (requires NVIDIA GPU + drivers)"
+
+packages:
+  dnf: [python3, python3-pip, python3-devel, git, curl, gcc, gcc-c++]
+  apt: [python3, python3-pip, python3-venv, python3-dev, git, curl, build-essential]
+  pacman: [python, python-pip, git, curl, base-devel]
+
+steps:
+  - shell: |
+      if ! command -v nvidia-smi >/dev/null; then
+        echo "nvidia-smi not found. Install NVIDIA drivers first." >&2
+        exit 1
+      fi
+      nvidia-smi -L
+    describe: Verify NVIDIA GPU + drivers are installed
+
+  - shell: |
+      command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
+    describe: Install uv (fast Python package manager)
+
+  - shell: |
+      command -v ollama >/dev/null || curl -fsSL https://ollama.com/install.sh | sh
+    describe: Install Ollama (local LLM runtime, GPU-accelerated if drivers present)
+
+  - shell: |
+      export PATH="$HOME/.local/bin:$PATH"
+      uv tool install --upgrade jupyterlab
+    describe: Install JupyterLab via uv tool
+
+  - write_file:
+      path: ~/ai-dev/pyproject.toml
+      content: |
+        # Managed by lux: ai-dev-cuda recipe
+        [project]
+        name = "ai-dev"
+        version = "0.1.0"
+        description = "Starter AI dev env (CUDA 12.1)"
+        requires-python = ">=3.10"
+        dependencies = [
+          "torch",
+          "transformers",
+          "datasets",
+          "accelerate",
+          "sentence-transformers",
+          "bitsandbytes",
+          "numpy",
+          "pandas",
+          "matplotlib",
+        ]
+
+        [tool.uv]
+        index-strategy = "unsafe-best-match"
+
+        [[tool.uv.index]]
+        name = "pytorch-cu121"
+        url = "https://download.pytorch.org/whl/cu121"
+        explicit = true
+
+        [tool.uv.sources]
+        torch = { index = "pytorch-cu121" }
+    describe: Create ~/ai-dev/pyproject.toml (CUDA 12.1 PyTorch + HuggingFace stack)
+
+  - shell: |
+      export PATH="$HOME/.local/bin:$PATH"
+      cd ~/ai-dev && uv sync
+    describe: Resolve and install Python deps into ~/ai-dev/.venv

@@ -1,0 +1,46 @@
+name: zsh-popular
+summary: "zsh + oh-my-zsh + autosuggestions + syntax-highlighting + Powerlevel10k"
+
+packages:
+  dnf: [zsh, git, curl, util-linux-user]
+  apt: [zsh, git, curl]
+  pacman: [zsh, git, curl]
+
+steps:
+  - shell: |
+      RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+    describe: Install oh-my-zsh (unattended)
+
+  - shell: |
+      test -d ~/.oh-my-zsh/custom/plugins/zsh-autosuggestions || \
+      git clone https://github.com/zsh-users/zsh-autosuggestions \
+        ~/.oh-my-zsh/custom/plugins/zsh-autosuggestions
+    describe: Install zsh-autosuggestions plugin
+
+  - shell: |
+      test -d ~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting || \
+      git clone https://github.com/zsh-users/zsh-syntax-highlighting \
+        ~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting
+    describe: Install zsh-syntax-highlighting plugin
+
+  - shell: |
+      test -d ~/.oh-my-zsh/custom/themes/powerlevel10k || \
+      git clone --depth=1 https://github.com/romkatv/powerlevel10k \
+        ~/.oh-my-zsh/custom/themes/powerlevel10k
+    describe: Install Powerlevel10k theme
+
+  - write_file:
+      path: ~/.zshrc
+      content: |
+        # Managed by lux: zsh-popular recipe
+        export ZSH="$HOME/.oh-my-zsh"
+        ZSH_THEME="powerlevel10k/powerlevel10k"
+        plugins=(git zsh-autosuggestions zsh-syntax-highlighting)
+        source $ZSH/oh-my-zsh.sh
+        # Powerlevel10k instant prompt
+        [[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
+    describe: Write ~/.zshrc with plugins and theme
+
+  - shell: chsh -s "$(which zsh)"
+    describe: Set zsh as default login shell
+    optional: true

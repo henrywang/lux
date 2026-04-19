@@ -42,11 +42,11 @@ const GUI_APPS: &[(&str, &str, Option<&str>)] = &[
     ("zoom", "us.zoom.Zoom", None),
     ("spotify", "com.spotify.Client", None),
     ("signal", "org.signal.Signal", None),
-    ("vs code", "com.visualstudio.code", None),
-    ("vscode", "com.visualstudio.code", None),
-    ("visual studio code", "com.visualstudio.code", None),
+    // vscode / vscodium / zed are owned by recipes (editor-vscodium,
+    // editor-zed). Keep them out of this table so `install vscode` routes
+    // through try_recipe → the canonical (native) install, not a
+    // community-repackaged flatpak.
     ("chrome", "com.google.Chrome", None),
-    ("zed", "dev.zed.Zed", None),
     ("sublime text", "com.sublimetext.three", None),
     ("sublime", "com.sublimetext.three", None),
     ("bitwarden", "com.bitwarden.desktop", None),
@@ -90,7 +90,12 @@ pub fn match_intent(input: &str, mode: SystemMode) -> Option<ToolCall> {
     let s = input.to_lowercase();
     let s = s.trim();
 
-    try_run_command(s)
+    // try_recipe comes before try_install so "install zsh with popular
+    // plugins" routes to apply_recipe(zsh-popular) rather than a bare
+    // install_package([zsh]).
+    try_list_recipes(s)
+        .or_else(|| try_recipe(s))
+        .or_else(|| try_run_command(s))
         .or_else(|| try_bootc(s))
         .or_else(|| try_firewall(s))
         .or_else(|| try_network(s))
@@ -101,6 +106,152 @@ pub fn match_intent(input: &str, mode: SystemMode) -> Option<ToolCall> {
         .or_else(|| try_remove(s))
         .or_else(|| try_service_action(s))
         .or_else(|| try_service_status(s))
+}
+
+/// Words that signal "I want the opinionated setup, not a bare install."
+/// Presence of any one of these alongside a recipe target flips the match
+/// from try_install to try_recipe.
+const RECIPE_INDICATORS: &[&str] = &[
+    "popular",
+    "configure",
+    "config",
+    "set up",
+    "setup",
+    "plugin",
+    "plugins",
+    "theme",
+    "recipe",
+    "dev env",
+    "dev environment",
+    "development environment",
+    "with the",
+    "nicely",
+];
+
+fn has_recipe_indicator(s: &str) -> bool {
+    RECIPE_INDICATORS.iter().any(|k| s.contains(k))
+}
+
+fn try_list_recipes(s: &str) -> Option<ToolCall> {
+    let asks_list = (s.contains("list") || s.contains("what") || s.contains("which"))
+        && s.contains("recipe");
+    let asks_available =
+        s.contains("available recipes") || s.contains("show recipes") || s == "recipes";
+    if asks_list || asks_available {
+        return Some(tool_call("list_recipes", json!({})));
+    }
+    None
+}
+
+fn try_recipe(s: &str) -> Option<ToolCall> {
+    // Direct invocation: "apply recipe X" / "apply the X recipe" / "run X recipe"
+    if s.contains("recipe") && (s.contains("apply") || s.contains("run"))
+        && let Some(name) = extract_recipe_name(s)
+    {
+        return Some(tool_call("apply_recipe", json!({"name": name})));
+    }
+
+    // Compound requests (multiple recipe targets mentioned) go to the LLM,
+    // which can emit several apply_recipe calls. The intent matcher only
+    // dispatches one tool call per turn.
+    let targets = ["zsh", "ghostty", "vscodium"];
+    let mut mentioned = targets.iter().filter(|t| s.contains(*t)).count();
+    if contains_word(s, "zed") {
+        mentioned += 1;
+    }
+    if mentioned > 1 {
+        return None;
+    }
+
+    // "set up an AI dev env" / "setup AI development environment"
+    let is_ai_dev = (contains_word(s, "ai") || contains_word(s, "ml")
+        || s.contains("machine learning"))
+        && (s.contains("dev") || s.contains("development"))
+        && (s.contains("env")
+            || s.contains("environment")
+            || s.contains("setup")
+            || s.contains("set up"));
+    if is_ai_dev {
+        let name = if s.contains("cuda") || s.contains("gpu") || s.contains("nvidia") {
+            "ai-dev-cuda"
+        } else {
+            "ai-dev-cpu"
+        };
+        return Some(tool_call("apply_recipe", json!({"name": name})));
+    }
+
+    // zsh has a recipe but bare "install zsh" is a valid no-frills request,
+    // so zsh-popular still requires an opinion-indicating keyword.
+    if s.contains("zsh") && has_recipe_indicator(s) {
+        return Some(tool_call("apply_recipe", json!({"name": "zsh-popular"})));
+    }
+
+    // For the tools below, the recipe is the ONLY canonical install path
+    // (we pruned them from GUI_APPS), so plain "install <tool>" also
+    // routes here. has_recipe_indicator is kept as an OR so phrasings
+    // like "set up zed" without "install" still match.
+    let install_or_indicator = s.contains("install") || has_recipe_indicator(s);
+
+    if s.contains("ghostty") && install_or_indicator {
+        return Some(tool_call(
+            "apply_recipe",
+            json!({"name": "ghostty-default"}),
+        ));
+    }
+
+    // "install vscode" routes to VSCodium — lux doesn't install Microsoft
+    // VSCode (telemetry + EULA). The plan text surfaces the substitution.
+    if (s.contains("vscodium") || s.contains("vscode") || s.contains("vs code")
+        || s.contains("visual studio code"))
+        && install_or_indicator
+    {
+        return Some(tool_call(
+            "apply_recipe",
+            json!({"name": "editor-vscodium"}),
+        ));
+    }
+
+    // editor-zed — word-boundary check to avoid "freeze"/"sized"/etc.
+    if contains_word(s, "zed") && install_or_indicator {
+        return Some(tool_call("apply_recipe", json!({"name": "editor-zed"})));
+    }
+
+    None
+}
+
+fn contains_word(s: &str, word: &str) -> bool {
+    s.split(|c: char| !c.is_alphanumeric() && c != '-' && c != '_')
+        .any(|w| w == word)
+}
+
+/// Extract a recipe name after "recipe" / "the X recipe" / "apply X".
+/// Names are hyphenated lowercase tokens.
+fn extract_recipe_name(s: &str) -> Option<String> {
+    // Pattern 1: "the <name> recipe"
+    if let Some(idx) = s.find(" recipe") {
+        let before = &s[..idx];
+        if let Some(tok) = before.split_whitespace().last()
+            && is_recipe_name_token(tok)
+            && tok != "the"
+            && tok != "a"
+        {
+            return Some(tok.to_string());
+        }
+    }
+    // Pattern 2: "apply <name>" / "run <name>"
+    for verb in &["apply ", "run "] {
+        if let Some(rest) = s.split(verb).nth(1)
+            && let Some(tok) = rest.split_whitespace().next()
+            && is_recipe_name_token(tok)
+        {
+            return Some(tok.to_string());
+        }
+    }
+    None
+}
+
+fn is_recipe_name_token(s: &str) -> bool {
+    s.contains('-') && s.chars().all(|c| c.is_ascii_lowercase() || c == '-')
 }
 
 /// High-confidence system info queries → run_command.
@@ -442,6 +593,13 @@ fn try_install(s: &str, mode: SystemMode) -> Option<ToolCall> {
     if !s.contains("install") && !s.starts_with("get ") {
         return None;
     }
+    // If the request has recipe-shaped intent ("configure", "popular",
+    // "plugins", "theme") but try_recipe didn't claim it (e.g. compound
+    // request spanning multiple recipes), delegate to the LLM rather than
+    // treating the whole sentence as a package list.
+    if has_recipe_indicator(s) {
+        return None;
+    }
 
     // Known GUI apps: prefer dnf on package-mode Fedora when available,
     // otherwise use flatpak.
@@ -617,9 +775,6 @@ mod tests {
         // Apps not in Fedora repos must use flatpak.
         assert_tool_args("install steam", "install_flatpak", |args| {
             assert_eq!(args["app_id"], "com.valvesoftware.Steam");
-        });
-        assert_tool_args("install vscode", "install_flatpak", |args| {
-            assert_eq!(args["app_id"], "com.visualstudio.code");
         });
     }
 
@@ -868,5 +1023,128 @@ mod tests {
         assert_no_match("help me with my computer");
         assert_no_match("what should I do?");
         assert_no_match("hello");
+    }
+
+    // ---- apply_recipe ----
+
+    #[test]
+    fn recipe_zsh_popular() {
+        assert_tool_args(
+            "install zsh with popular plugins",
+            "apply_recipe",
+            |args| {
+                assert_eq!(args["name"], "zsh-popular");
+            },
+        );
+        assert_tool_args("set up zsh nicely", "apply_recipe", |args| {
+            assert_eq!(args["name"], "zsh-popular");
+        });
+        assert_tool_args("configure zsh with a popular theme", "apply_recipe", |args| {
+            assert_eq!(args["name"], "zsh-popular");
+        });
+    }
+
+    #[test]
+    fn recipe_ai_dev_env() {
+        assert_tool_args(
+            "set up an AI dev environment",
+            "apply_recipe",
+            |args| {
+                assert_eq!(args["name"], "ai-dev-cpu");
+            },
+        );
+        assert_tool_args(
+            "setup AI development environment with cuda",
+            "apply_recipe",
+            |args| {
+                assert_eq!(args["name"], "ai-dev-cuda");
+            },
+        );
+        assert_tool_args(
+            "set up ML dev env with GPU",
+            "apply_recipe",
+            |args| {
+                assert_eq!(args["name"], "ai-dev-cuda");
+            },
+        );
+    }
+
+    #[test]
+    fn recipe_ghostty() {
+        assert_tool_args(
+            "install ghostty and configure it",
+            "apply_recipe",
+            |args| {
+                assert_eq!(args["name"], "ghostty-default");
+            },
+        );
+    }
+
+    #[test]
+    fn recipe_editor_zed() {
+        assert_tool_args("set up zed with config", "apply_recipe", |args| {
+            assert_eq!(args["name"], "editor-zed");
+        });
+        // Plain "install zed" now routes to the recipe (pruned from GUI_APPS).
+        assert_tool_args("install zed", "apply_recipe", |args| {
+            assert_eq!(args["name"], "editor-zed");
+        });
+        // "zed" must not match inside other words
+        assert_no_match("my laptop freezed");
+    }
+
+    #[test]
+    fn install_vscode_routes_to_vscodium_recipe() {
+        // Microsoft VSCode is not installed by lux — recipe swaps to VSCodium.
+        assert_tool_args("install vscode", "apply_recipe", |args| {
+            assert_eq!(args["name"], "editor-vscodium");
+        });
+        assert_tool_args("install vscodium", "apply_recipe", |args| {
+            assert_eq!(args["name"], "editor-vscodium");
+        });
+    }
+
+    #[test]
+    fn install_ghostty_routes_to_recipe() {
+        assert_tool_args("install ghostty", "apply_recipe", |args| {
+            assert_eq!(args["name"], "ghostty-default");
+        });
+    }
+
+    #[test]
+    fn recipe_direct_invocation() {
+        assert_tool_args(
+            "apply the zsh-popular recipe",
+            "apply_recipe",
+            |args| {
+                assert_eq!(args["name"], "zsh-popular");
+            },
+        );
+        assert_tool_args("run ai-dev-cpu recipe", "apply_recipe", |args| {
+            assert_eq!(args["name"], "ai-dev-cpu");
+        });
+    }
+
+    #[test]
+    fn list_recipes_intent() {
+        assert_tool("list recipes", "list_recipes");
+        assert_tool("what recipes are available", "list_recipes");
+    }
+
+    #[test]
+    fn bare_install_unaffected() {
+        // "install zsh" without recipe indicators goes to install_package.
+        assert_tool_args("install zsh", "install_package", |args| {
+            assert_eq!(args["packages"][0], "zsh");
+        });
+    }
+
+    #[test]
+    fn compound_recipe_request_delegates_to_llm() {
+        // Mentioning multiple recipe targets falls through so the LLM can
+        // orchestrate several apply_recipe calls.
+        assert_no_match(
+            "install ghostty, zsh and configure them with popular plugins and theme",
+        );
     }
 }

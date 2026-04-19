@@ -1,0 +1,59 @@
+name: ai-dev-cpu
+summary: "AI dev environment (CPU): uv + Jupyter + HuggingFace + Ollama"
+
+packages:
+  dnf: [python3, python3-pip, python3-devel, git, curl, gcc, gcc-c++]
+  apt: [python3, python3-pip, python3-venv, python3-dev, git, curl, build-essential]
+  pacman: [python, python-pip, git, curl, base-devel]
+
+steps:
+  - shell: |
+      command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
+    describe: Install uv (fast Python package manager)
+
+  - shell: |
+      command -v ollama >/dev/null || curl -fsSL https://ollama.com/install.sh | sh
+    describe: Install Ollama (local LLM runtime)
+
+  - shell: |
+      export PATH="$HOME/.local/bin:$PATH"
+      uv tool install --upgrade jupyterlab
+    describe: Install JupyterLab via uv tool
+
+  - write_file:
+      path: ~/ai-dev/pyproject.toml
+      content: |
+        # Managed by lux: ai-dev-cpu recipe
+        [project]
+        name = "ai-dev"
+        version = "0.1.0"
+        description = "Starter AI dev env (CPU)"
+        requires-python = ">=3.10"
+        dependencies = [
+          "torch",
+          "transformers",
+          "datasets",
+          "accelerate",
+          "sentence-transformers",
+          "numpy",
+          "pandas",
+          "matplotlib",
+        ]
+
+        [tool.uv]
+        # CPU-only PyTorch index
+        index-strategy = "unsafe-best-match"
+
+        [[tool.uv.index]]
+        name = "pytorch-cpu"
+        url = "https://download.pytorch.org/whl/cpu"
+        explicit = true
+
+        [tool.uv.sources]
+        torch = { index = "pytorch-cpu" }
+    describe: Create ~/ai-dev/pyproject.toml (CPU PyTorch + HuggingFace stack)
+
+  - shell: |
+      export PATH="$HOME/.local/bin:$PATH"
+      cd ~/ai-dev && uv sync
+    describe: Resolve and install Python deps into ~/ai-dev/.venv

@@ -1,0 +1,30 @@
+name: editor-zed
+summary: "Zed editor (official install script) with a minimal theme + font config"
+
+# No distro packages — Zed publishes an install script that works across
+# distros and keeps the binary current via Zed's own auto-updater. This is
+# what https://zed.dev/docs/linux recommends first.
+
+steps:
+  - shell: |
+      if ! command -v zed >/dev/null; then
+        curl -fsSL https://zed.dev/install.sh | sh
+      fi
+    describe: Install Zed via official install script (~/.local/bin/zed)
+
+  - write_file:
+      path: ~/.config/zed/settings.json
+      content: |
+        {
+          "theme": "One Dark",
+          "buffer_font_family": "JetBrains Mono",
+          "buffer_font_size": 13,
+          "ui_font_size": 14,
+          "vim_mode": false,
+          "format_on_save": "on",
+          "telemetry": {
+            "diagnostics": false,
+            "metrics": false
+          }
+        }
+    describe: Write ~/.config/zed/settings.json
