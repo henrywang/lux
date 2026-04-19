@@ -6,30 +6,18 @@ use crate::recipe::Recipe;
 /// is `(file-stem-used-as-id, raw-yaml)`. The name inside the YAML must match
 /// the id — a debug_assert in `RecipeRegistry::new` enforces this.
 const BUNDLED: &[(&str, &str)] = &[
-    (
-        "zsh-popular",
-        include_str!("../recipes/zsh-popular.yaml"),
-    ),
+    ("zsh-popular", include_str!("../recipes/zsh-popular.yaml")),
     (
         "ghostty-default",
         include_str!("../recipes/ghostty-default.yaml"),
     ),
-    (
-        "ai-dev-cpu",
-        include_str!("../recipes/ai-dev-cpu.yaml"),
-    ),
-    (
-        "ai-dev-cuda",
-        include_str!("../recipes/ai-dev-cuda.yaml"),
-    ),
+    ("ai-dev-cpu", include_str!("../recipes/ai-dev-cpu.yaml")),
+    ("ai-dev-cuda", include_str!("../recipes/ai-dev-cuda.yaml")),
     (
         "editor-vscodium",
         include_str!("../recipes/editor-vscodium.yaml"),
     ),
-    (
-        "editor-zed",
-        include_str!("../recipes/editor-zed.yaml"),
-    ),
+    ("editor-zed", include_str!("../recipes/editor-zed.yaml")),
 ];
 
 pub struct RecipeRegistry {
@@ -99,10 +87,14 @@ mod tests {
     fn editor_zed_writes_unsandboxed_settings_path() {
         let reg = RecipeRegistry::new().unwrap();
         let zed = reg.get("editor-zed").unwrap();
-        let write = zed.steps.iter().find_map(|s| match s {
-            Step::Write { write_file, .. } => Some(write_file),
-            _ => None,
-        }).expect("editor-zed has a write_file step");
+        let write = zed
+            .steps
+            .iter()
+            .find_map(|s| match s {
+                Step::Write { write_file, .. } => Some(write_file),
+                _ => None,
+            })
+            .expect("editor-zed has a write_file step");
         assert_eq!(write.path, "~/.config/zed/settings.json");
     }
 }

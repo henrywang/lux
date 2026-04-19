@@ -133,8 +133,8 @@ fn has_recipe_indicator(s: &str) -> bool {
 }
 
 fn try_list_recipes(s: &str) -> Option<ToolCall> {
-    let asks_list = (s.contains("list") || s.contains("what") || s.contains("which"))
-        && s.contains("recipe");
+    let asks_list =
+        (s.contains("list") || s.contains("what") || s.contains("which")) && s.contains("recipe");
     let asks_available =
         s.contains("available recipes") || s.contains("show recipes") || s == "recipes";
     if asks_list || asks_available {
@@ -145,7 +145,8 @@ fn try_list_recipes(s: &str) -> Option<ToolCall> {
 
 fn try_recipe(s: &str) -> Option<ToolCall> {
     // Direct invocation: "apply recipe X" / "apply the X recipe" / "run X recipe"
-    if s.contains("recipe") && (s.contains("apply") || s.contains("run"))
+    if s.contains("recipe")
+        && (s.contains("apply") || s.contains("run"))
         && let Some(name) = extract_recipe_name(s)
     {
         return Some(tool_call("apply_recipe", json!({"name": name})));
@@ -164,13 +165,13 @@ fn try_recipe(s: &str) -> Option<ToolCall> {
     }
 
     // "set up an AI dev env" / "setup AI development environment"
-    let is_ai_dev = (contains_word(s, "ai") || contains_word(s, "ml")
-        || s.contains("machine learning"))
-        && (s.contains("dev") || s.contains("development"))
-        && (s.contains("env")
-            || s.contains("environment")
-            || s.contains("setup")
-            || s.contains("set up"));
+    let is_ai_dev =
+        (contains_word(s, "ai") || contains_word(s, "ml") || s.contains("machine learning"))
+            && (s.contains("dev") || s.contains("development"))
+            && (s.contains("env")
+                || s.contains("environment")
+                || s.contains("setup")
+                || s.contains("set up"));
     if is_ai_dev {
         let name = if s.contains("cuda") || s.contains("gpu") || s.contains("nvidia") {
             "ai-dev-cuda"
@@ -201,7 +202,9 @@ fn try_recipe(s: &str) -> Option<ToolCall> {
 
     // "install vscode" routes to VSCodium — lux doesn't install Microsoft
     // VSCode (telemetry + EULA). The plan text surfaces the substitution.
-    if (s.contains("vscodium") || s.contains("vscode") || s.contains("vs code")
+    if (s.contains("vscodium")
+        || s.contains("vscode")
+        || s.contains("vs code")
         || s.contains("visual studio code"))
         && install_or_indicator
     {
@@ -1029,30 +1032,26 @@ mod tests {
 
     #[test]
     fn recipe_zsh_popular() {
+        assert_tool_args("install zsh with popular plugins", "apply_recipe", |args| {
+            assert_eq!(args["name"], "zsh-popular");
+        });
+        assert_tool_args("set up zsh nicely", "apply_recipe", |args| {
+            assert_eq!(args["name"], "zsh-popular");
+        });
         assert_tool_args(
-            "install zsh with popular plugins",
+            "configure zsh with a popular theme",
             "apply_recipe",
             |args| {
                 assert_eq!(args["name"], "zsh-popular");
             },
         );
-        assert_tool_args("set up zsh nicely", "apply_recipe", |args| {
-            assert_eq!(args["name"], "zsh-popular");
-        });
-        assert_tool_args("configure zsh with a popular theme", "apply_recipe", |args| {
-            assert_eq!(args["name"], "zsh-popular");
-        });
     }
 
     #[test]
     fn recipe_ai_dev_env() {
-        assert_tool_args(
-            "set up an AI dev environment",
-            "apply_recipe",
-            |args| {
-                assert_eq!(args["name"], "ai-dev-cpu");
-            },
-        );
+        assert_tool_args("set up an AI dev environment", "apply_recipe", |args| {
+            assert_eq!(args["name"], "ai-dev-cpu");
+        });
         assert_tool_args(
             "setup AI development environment with cuda",
             "apply_recipe",
@@ -1060,24 +1059,16 @@ mod tests {
                 assert_eq!(args["name"], "ai-dev-cuda");
             },
         );
-        assert_tool_args(
-            "set up ML dev env with GPU",
-            "apply_recipe",
-            |args| {
-                assert_eq!(args["name"], "ai-dev-cuda");
-            },
-        );
+        assert_tool_args("set up ML dev env with GPU", "apply_recipe", |args| {
+            assert_eq!(args["name"], "ai-dev-cuda");
+        });
     }
 
     #[test]
     fn recipe_ghostty() {
-        assert_tool_args(
-            "install ghostty and configure it",
-            "apply_recipe",
-            |args| {
-                assert_eq!(args["name"], "ghostty-default");
-            },
-        );
+        assert_tool_args("install ghostty and configure it", "apply_recipe", |args| {
+            assert_eq!(args["name"], "ghostty-default");
+        });
     }
 
     #[test]
@@ -1113,13 +1104,9 @@ mod tests {
 
     #[test]
     fn recipe_direct_invocation() {
-        assert_tool_args(
-            "apply the zsh-popular recipe",
-            "apply_recipe",
-            |args| {
-                assert_eq!(args["name"], "zsh-popular");
-            },
-        );
+        assert_tool_args("apply the zsh-popular recipe", "apply_recipe", |args| {
+            assert_eq!(args["name"], "zsh-popular");
+        });
         assert_tool_args("run ai-dev-cpu recipe", "apply_recipe", |args| {
             assert_eq!(args["name"], "ai-dev-cpu");
         });
@@ -1143,8 +1130,6 @@ mod tests {
     fn compound_recipe_request_delegates_to_llm() {
         // Mentioning multiple recipe targets falls through so the LLM can
         // orchestrate several apply_recipe calls.
-        assert_no_match(
-            "install ghostty, zsh and configure them with popular plugins and theme",
-        );
+        assert_no_match("install ghostty, zsh and configure them with popular plugins and theme");
     }
 }

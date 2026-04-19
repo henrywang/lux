@@ -66,12 +66,11 @@ impl Tool for ApplyRecipe {
     fn definition(&self) -> ToolDef {
         ToolDef {
             name: "apply_recipe".into(),
-            description:
-                "Apply a named recipe (multi-step opinionated setup). Shows the planned \
+            description: "Apply a named recipe (multi-step opinionated setup). Shows the planned \
                  actions and asks for confirmation before executing. Known recipes: \
                  zsh-popular, ghostty-default, ai-dev-cpu, ai-dev-cuda, editor-vscodium, \
                  editor-zed."
-                    .into(),
+                .into(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -110,9 +109,7 @@ impl Tool for ApplyRecipe {
 
         if !assume_yes {
             if !stdin_is_tty() {
-                bail!(
-                    "refusing to run recipe '{name}' non-interactively without assume_yes: true"
-                );
+                bail!("refusing to run recipe '{name}' non-interactively without assume_yes: true");
             }
             if !prompt_yes_no("Apply this recipe?").await? {
                 return Ok("Cancelled.".into());
