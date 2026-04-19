@@ -35,6 +35,39 @@ Rule of thumb: if the answer is one package-manager call, put it in
 `GUI_APPS`. If it's "run X, clone Y, write file Z, maybe run W," write a
 recipe.
 
+### Principle: recipes are cross-distro; the rest of lux is Fedora-first
+
+The recipe layer and the core tool layer have **different distro
+support stories**, and that split is intentional.
+
+| Layer | Fedora/RHEL | Arch | Debian/Ubuntu |
+|---|---|---|---|
+| Core tools (`install_package`, `manage_firewall`, `bootc_*`, `rpm -q` shortcuts) | Supported | Not yet | Not yet |
+| Recipes (`apply_recipe`) | Primary target | Best-effort | Per-recipe |
+
+**Why split:** the install-method dispatch each recipe needs (`command -v
+dnf/apt/pacman`) is local to one shell step — adding the Arch and
+Debian branches alongside the Fedora one is marginal extra work, and
+the per-distro paths come straight from the upstream tool's docs.
+Generalising the *core tools* the same way is a much larger project:
+package-manager backends, firewall abstraction, distro-specific service
+names. Until that lands, recipes can ship cross-distro value without
+waiting for it.
+
+**What it means for a recipe author:**
+
+- Always provide the Fedora path. It will be tested first.
+- Provide Arch and Debian paths when upstream supports them. If they
+  don't, fail explicitly (`echo "..." >&2; exit 1`) rather than silently
+  skipping.
+- Don't assume any other lux tool works on the user's distro. Recipes
+  should be self-contained: install + configure, not "install then call
+  `manage_firewall`."
+
+**What it means for a user on Arch/Debian:** recipes will mostly work;
+asking the agent "is nginx running?" or "open port 8080" will fail until
+the core tools grow per-distro backends.
+
 ### Principle: install the way the tool's own docs say to
 
 **Do not uniformly install everything as a Flatpak.** The temptation is

@@ -103,10 +103,16 @@ First run writes `~/.config/lux/luxd.toml`; edit to tune `mode`,
 
 ## Requirements
 
-- **Fedora 41+ / RHEL 9+ / CentOS Stream 9+** — lux is built around the
-  Fedora family (dnf, firewalld, bootc). Ubuntu/Debian/Arch can run the
-  binary, but tools that wrap dnf or firewall-cmd will report the distro
-  as unsupported until cross-distro backends land.
+- **Core agent: Fedora 41+ / RHEL 9+ / CentOS Stream 9+.** The
+  `install_package`, `manage_firewall`, `bootc_*` tools and several
+  `run_command` shortcuts assume `dnf`, `firewalld`, `bootc`, and `rpm`.
+  On other distros the binary runs but those tools fail until
+  cross-distro backends land.
+- **Recipes (`apply_recipe`): cross-distro best-effort.** Each recipe
+  dispatches on `dnf`/`apt`/`pacman` and uses the install method the
+  upstream tool's docs recommend. Recipes without an upstream path on a
+  given distro fail explicitly rather than silently. Fedora is the
+  primary target; Arch is well-covered; Debian/Ubuntu varies per recipe.
 - Rust 1.85+
 - [ollama](https://ollama.com/) (for the LLM fallback path)
 
