@@ -43,7 +43,7 @@ jobs:
         run: cargo build --release --bin lux
 
       - name: Upload binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lux-binary
           path: target/release/lux
@@ -102,7 +102,7 @@ jobs:
           chmod +x /usr/local/bin/sudo
 
       - name: Download lux binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: lux-binary
           path: .
