@@ -57,6 +57,8 @@ Both paths route to the same set of system tools that actually execute operation
 | `install_flatpak` | Install GUI apps from Flathub (firefox, vlc, gimp, etc.) |
 | `install_package` | Install CLI tools via dnf (vim, git, gcc, etc.) |
 | `remove_package` | Remove system packages |
+| `apply_recipe` | Apply a named multi-step setup (zsh-popular, editor-vscodium, etc.) |
+| `list_recipes` | Show all available recipes |
 | `manage_service` | Start, stop, enable, disable, restart systemd services |
 | `check_service_status` | Check if a service is running |
 | `read_logs` | Read journalctl logs with filters |
@@ -148,6 +150,24 @@ cd lux
 RUST_LOG=debug ./target/release/lux
 ```
 
+### Recipes
+
+Recipes are opinionated multi-step setups bundled into lux. They're
+normally invoked in natural language (`install zsh with popular
+plugins`, `set up an AI dev environment`) but a dedicated subcommand
+bypasses the LLM entirely — handy for scripts, CI, and when you
+already know the recipe name:
+
+```bash
+./target/release/lux recipe list
+./target/release/lux recipe apply zsh-popular          # prompts for confirmation
+./target/release/lux recipe apply zsh-popular --yes    # non-interactive
+```
+
+Currently bundled: `zsh-popular`, `ghostty-default`, `ai-dev-cpu`,
+`ai-dev-cuda`, `editor-vscodium`, `editor-zed`, `browser-chromium`,
+`editor-sublime`, `zoom`.
+
 ## Development
 
 Common tasks are available via [`just`](https://github.com/casey/just):
@@ -170,7 +190,7 @@ crates/
   lux-agent/     Core agent loop + intent matcher
   lux-llm/       LLM backend (ollama HTTP client)
   lux-tools/     System tool implementations
-  lux-knowledge/ Knowledge base (planned)
+  lux-knowledge/ Recipe registry (bundled YAML)
   luxd/          Background monitor (failed units, AVC, disk)
 bench/           Benchmark harness + scenarios
 finetune/        LoRA fine-tuning scripts + dataset
