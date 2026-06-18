@@ -20,7 +20,7 @@ jobs:
           - source: docs/hf-model-card-lux.md
             repo: henrywangxf/lux
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install hf CLI
         run: pip install --quiet huggingface_hub
